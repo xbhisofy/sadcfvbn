@@ -230,10 +230,10 @@ async function postCommentOnPage(page, commentText) {
   // Click comment icon if present (especially on Reels layout)
   try {
     const commentIcon = page.locator('svg[aria-label="Comment"], svg[aria-label="Kommentieren"], div[role="button"]:has(svg[aria-label="Comment"])').first();
-    if (await commentIcon.isVisible({ timeout: 2500 })) {
+    if (await commentIcon.isVisible({ timeout: 3500 })) {
       await commentIcon.click({ force: true });
       addLog(`[✓] Clicked comment icon`, 'info');
-      await page.waitForTimeout(1500);
+      await page.waitForTimeout(2500);
     }
   } catch (_) {}
 
@@ -241,42 +241,52 @@ async function postCommentOnPage(page, commentText) {
   const inputSelectors = [
     'input[placeholder*="comment"i]',
     'input[placeholder*="Add a comment"i]',
+    'input[placeholder*="Kommentar"i]',
     'textarea[placeholder*="comment"i]',
     'textarea[aria-label*="comment"i]',
-    'textarea',
+    'form textarea',
+    'form input[type="text"]',
     'div[contenteditable="true"]',
     'div[role="textbox"]',
-    'form textarea'
+    'textarea'
   ];
 
-  for (const sel of inputSelectors) {
-    try {
-      const inputEl = page.locator(sel).first();
-      if (await inputEl.isVisible({ timeout: 2000 })) {
-        await inputEl.click({ force: true });
-        focused = true;
-        addLog(`[✓] Focused input box using selector: ${sel}`, 'info');
-        break;
-      }
-    } catch (_) {}
-  }
+  // Poll for up to 15 seconds to let Instagram GraphQL load comment drawer
+  addLog(`[+] Waiting for comment box to render...`, 'info');
+  const startWait = Date.now();
+  while (Date.now() - startWait < 15000 && !focused) {
+    for (const sel of inputSelectors) {
+      try {
+        const inputEl = page.locator(sel).first();
+        if (await inputEl.isVisible({ timeout: 1200 })) {
+          await inputEl.click({ force: true });
+          focused = true;
+          addLog(`[✓] Focused input box using selector: ${sel}`, 'info');
+          break;
+        }
+      } catch (_) {}
+    }
 
-  if (!focused) {
-    try {
-      const placeholderText = page.getByText(/Add a comment/i).first();
-      if (await placeholderText.isVisible({ timeout: 2000 })) {
-        await placeholderText.click({ force: true });
-        focused = true;
-      }
-    } catch (_) {}
+    if (!focused) {
+      try {
+        const placeholderText = page.getByText(/Add a comment/i).first();
+        if (await placeholderText.isVisible({ timeout: 1000 })) {
+          await placeholderText.click({ force: true });
+          focused = true;
+          addLog(`[✓] Focused comment box via placeholder text`, 'info');
+          break;
+        }
+      } catch (_) {}
+      await page.waitForTimeout(1000);
+    }
   }
 
   if (!focused) {
     try {
       await page.screenshot({ path: path.join(__dirname, 'public', 'last_error.png') });
-      addLog(`📸 Saved error screenshot: http://5.175.140.53:3000/last_error.png`, 'warning');
+      addLog(`📸 Saved error screenshot: https://whopgrow.online/last_error.png`, 'warning');
     } catch (_) {}
-    throw new Error('Could not locate comment input. Ensure account is logged into Instagram.');
+    throw new Error('Could not locate comment input. Ensure account is logged into Instagram and post allows comments.');
   }
 
   await page.waitForTimeout(1000);
