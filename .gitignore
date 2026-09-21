@@ -1,0 +1,7 @@
+node_modules/
+profiles/
+user_data/
+proxies.json
+*.log
+*.tar.gz
+update.tar.gz
