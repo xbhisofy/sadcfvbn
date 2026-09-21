@@ -146,7 +146,18 @@
     .features-grid {
       display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.25rem;
     }
-    @media (max-width: 700px) { .features-grid { grid-template-columns: 1fr; } }
+    @media (max-width: 700px) { 
+      .features-grid { grid-template-columns: 1fr; } 
+    }
+    @media (max-width: 600px) {
+      body { padding: 1.5rem 0.8rem; }
+      .hero-title { font-size: 2.1rem; line-height: 1.2; }
+      .main-card { padding: 1.5rem 1.15rem; border-radius: 20px; margin-bottom: 1.8rem; }
+      .card-heading { font-size: 1.28rem; margin-bottom: 1.3rem; }
+      .stepper { padding: 0; margin-bottom: 1.5rem; }
+      .step-item { font-size: 0.78rem; }
+      .btn-submit { padding: 1rem; font-size: 1.05rem; }
+    }
 
     .feature-card {
       background: #ffffff; border: 1px solid #e2e8f0;
