@@ -239,6 +239,10 @@ async function followUserOnPage(page, targetUser) {
   addLog(`[+] Waiting for profile page to render...`, 'info');
   await page.waitForTimeout(4000);
 
+  if (page.url().includes('/accounts/login') || page.url().includes('/accounts/suspended')) {
+    throw new Error('Instagram account session expired or logged out. Please update account session in Admin.');
+  }
+
   // Dismiss any popups or modals
   try {
     const closeBtn = page.locator('svg[aria-label="Close"], button:has(svg[aria-label="Close"]), div[role="dialog"] button').first();
@@ -295,6 +299,10 @@ async function followUserOnPage(page, targetUser) {
 async function postCommentOnPage(page, commentText) {
   addLog(`[+] Waiting 5s for page to render...`, 'info');
   await page.waitForTimeout(5000);
+
+  if (page.url().includes('/accounts/login') || page.url().includes('/accounts/suspended')) {
+    throw new Error('Instagram account session expired or logged out. Please update account session in Admin.');
+  }
 
   // Close any popup/modal dialog (like "Never miss a post from...")
   try {
@@ -653,6 +661,12 @@ async function runFollowAutomationTask(rawTarget, profiles) {
       await page.addInitScript(() => {
         Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
       });
+
+      try {
+        addLog(`🌐 Priming session on Instagram home...`, 'info');
+        await page.goto('https://www.instagram.com/', { waitUntil: 'domcontentloaded', timeout: 30000 });
+        await page.waitForTimeout(3000);
+      } catch (_) {}
 
       try {
         const profileUrl = `https://www.instagram.com/${username}/`;
