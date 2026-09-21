@@ -180,6 +180,24 @@
     .admin-link a { color: #94a3b8; text-decoration: none; cursor: pointer; }
     .admin-link a:hover { text-decoration: underline; color: #ec4899; }
 
+    /* Service Tabs Switcher */
+    .service-tabs {
+      display: flex; justify-content: center; gap: 12px; margin-bottom: 2rem;
+    }
+    .service-tab {
+      background: #ffffff; border: 1.5px solid #e2e8f0;
+      padding: 0.75rem 1.5rem; border-radius: 50px;
+      font-size: 0.95rem; font-weight: 700; color: var(--text-dark);
+      cursor: pointer; transition: all 0.2s ease;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+    }
+    .service-tab:hover { border-color: #f472b6; }
+    .service-tab.active {
+      background: var(--pink-gradient); color: #fff;
+      border-color: transparent;
+      box-shadow: 0 8px 22px rgba(236, 72, 153, 0.35);
+    }
+
     /* Modal */
     .modal-overlay {
       position: fixed; top: 0; left: 0; width: 100%; height: 100%;
@@ -202,33 +220,50 @@
       </div>
     </div>
 
+    <!-- Service Tabs -->
+    <div class="service-tabs">
+      <button class="service-tab active" id="tabComment" onclick="switchTab('comment')">💬 Free Comments</button>
+      <button class="service-tab" id="tabFollower" onclick="switchTab('follower')">👤 Free Followers</button>
+    </div>
+
     <!-- Hero Title -->
-    <h1 class="hero-title">Free Instagram Comment</h1>
-    <div class="hero-sub">1 custom comment on any post. No password. No credit card.</div>
-    <div class="hero-tags">Your exact words · Real-looking account · Delivered in minutes</div>
+    <h1 class="hero-title" id="heroTitle">Free Instagram Comment</h1>
+    <div class="hero-sub" id="heroSub">1 custom comment on any post. No password. No credit card.</div>
+    <div class="hero-tags" id="heroTags">Your exact words · Real-looking account · Delivered in minutes</div>
 
     <!-- Main Form Card -->
     <div class="main-card">
       <div class="stepper">
         <div class="stepper-line"></div>
         <div class="stepper-fill" id="stepFill"></div>
-        <div class="step-item">💬 Select Post</div>
-        <div class="step-item" style="color:var(--text-muted);" id="step2Tag">✨ Get Comment</div>
+        <div class="step-item" id="step1Tag">💬 Select Post</div>
+        <div class="step-item" style="color:var(--text-muted);" id="step2Tag">✨ Delivered Live</div>
       </div>
 
-      <div class="card-heading">Select Post & Write Comment</div>
+      <div class="card-heading" id="cardHeading">Select Post & Write Comment</div>
 
-      <div class="input-group">
-        <label class="input-label" for="postLink">Instagram Post or Reel Link</label>
-        <input type="url" id="postLink" class="styled-input" placeholder="https://www.instagram.com/reel/xxxx/" required>
+      <!-- Comments Form Group -->
+      <div id="commentGroup">
+        <div class="input-group">
+          <label class="input-label" for="postLink">Instagram Post or Reel Link</label>
+          <input type="url" id="postLink" class="styled-input" placeholder="https://www.instagram.com/reel/xxxx/">
+        </div>
+
+        <div class="input-group">
+          <label class="input-label" for="customComment">Custom Comment</label>
+          <textarea id="customComment" class="styled-input" placeholder="Type your custom comment here... (e.g. awesome post 🔥)"></textarea>
+        </div>
       </div>
 
-      <div class="input-group">
-        <label class="input-label" for="customComment">Custom Comment</label>
-        <textarea id="customComment" class="styled-input" placeholder="Type your custom comment here... (e.g. awesome post 🔥)" required></textarea>
+      <!-- Followers Form Group -->
+      <div id="followerGroup" style="display:none;">
+        <div class="input-group">
+          <label class="input-label" for="profileUsername">Instagram Username or Profile Link</label>
+          <input type="text" id="profileUsername" class="styled-input" placeholder="e.g. @yourusername or https://www.instagram.com/yourusername/">
+        </div>
       </div>
 
-      <button class="btn-submit" id="submitBtn" onclick="submitFreeComment()">Get Free Comment</button>
+      <button class="btn-submit" id="submitBtn" onclick="handleSubmit()">Get Free Comment</button>
 
       <div class="live-status-box" id="statusBox"></div>
     </div>
@@ -277,6 +312,92 @@
   </div>
 
   <script>
+    let currentService = 'comment';
+
+    function switchTab(service) {
+      currentService = service;
+      const box = document.getElementById('statusBox');
+      box.style.display = 'none';
+      document.getElementById('stepFill').style.width = '30%';
+
+      if (service === 'comment') {
+        document.getElementById('tabComment').className = 'service-tab active';
+        document.getElementById('tabFollower').className = 'service-tab';
+        document.getElementById('heroTitle').innerText = 'Free Instagram Comment';
+        document.getElementById('heroSub').innerText = '1 custom comment on any post. No password. No credit card.';
+        document.getElementById('heroTags').innerText = 'Your exact words · Real-looking account · Delivered in minutes';
+        document.getElementById('cardHeading').innerText = 'Select Post & Write Comment';
+        document.getElementById('step1Tag').innerHTML = '💬 Select Post';
+        document.getElementById('commentGroup').style.display = 'block';
+        document.getElementById('followerGroup').style.display = 'none';
+        document.getElementById('submitBtn').innerText = 'Get Free Comment';
+      } else {
+        document.getElementById('tabFollower').className = 'service-tab active';
+        document.getElementById('tabComment').className = 'service-tab';
+        document.getElementById('heroTitle').innerText = 'Free Instagram Followers';
+        document.getElementById('heroSub').innerText = '100% Free real followers. No password needed.';
+        document.getElementById('heroTags').innerText = 'Instant delivery · Real profile · Completely safe';
+        document.getElementById('cardHeading').innerText = 'Enter Profile & Get Free Follower';
+        document.getElementById('step1Tag').innerHTML = '👤 Enter Profile';
+        document.getElementById('commentGroup').style.display = 'none';
+        document.getElementById('followerGroup').style.display = 'block';
+        document.getElementById('submitBtn').innerText = 'Get Free Follower';
+      }
+    }
+
+    function handleSubmit() {
+      if (currentService === 'comment') {
+        submitFreeComment();
+      } else {
+        submitFreeFollower();
+      }
+    }
+
+    async function submitFreeFollower() {
+      const username = document.getElementById('profileUsername').value.trim();
+      const btn = document.getElementById('submitBtn');
+      const box = document.getElementById('statusBox');
+
+      if (!username) {
+        alert('Please enter your Instagram Username or Profile Link!');
+        return;
+      }
+
+      btn.disabled = true;
+      btn.innerText = '⚡ Delivering Follower...';
+      document.getElementById('stepFill').style.width = '70%';
+      document.getElementById('step2Tag').style.color = '#ec4899';
+
+      box.style.display = 'flex';
+      box.className = 'live-status-box status-running';
+      box.innerHTML = '⚡ Processing follower order... Connecting to engine...';
+
+      try {
+        const res = await fetch('/api/free-follower', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username })
+        });
+
+        const data = await res.json();
+        if (data.success) {
+          box.className = 'live-status-box status-running';
+          box.innerHTML = '⚡ Instagram browser engine launched... Opening profile...';
+          setTimeout(pollStatus, 1500);
+        } else {
+          box.className = 'live-status-box status-error';
+          box.innerHTML = '⚠️ Error: ' + (data.error || 'Failed to submit follower request.');
+          btn.disabled = false;
+          btn.innerText = 'Get Free Follower';
+        }
+      } catch (e) {
+        box.className = 'live-status-box status-error';
+        box.innerHTML = '⚠️ Connection error: ' + e.message;
+        btn.disabled = false;
+        btn.innerText = 'Get Free Follower';
+      }
+    }
+
     async function submitFreeComment() {
       const link = document.getElementById('postLink').value.trim();
       const comment = document.getElementById('customComment').value.trim();
@@ -333,9 +454,11 @@
         if (s.status === 'completed' || s.completedTasks > 0) {
           document.getElementById('stepFill').style.width = '100%';
           box.className = 'live-status-box status-success';
-          box.innerHTML = '✅ SUCCESS! Comment has been posted live on Instagram!';
+          box.innerHTML = currentService === 'follower'
+            ? '✅ SUCCESS! Follower has been sent live to your Instagram profile!'
+            : '✅ SUCCESS! Comment has been posted live on Instagram!';
           btn.disabled = false;
-          btn.innerText = 'Get Another Free Comment';
+          btn.innerText = currentService === 'follower' ? 'Get Another Free Follower' : 'Get Another Free Comment';
         } else if (s.status === 'failed' || (s.totalTasks > 0 && s.failedTasks >= s.totalTasks)) {
           const errLog = (s.logs && s.logs.slice().reverse().find(l => l.type === 'error')?.message) || 'Failed to post comment. Please check link and try again.';
           box.className = 'live-status-box status-error';

@@ -195,6 +195,103 @@ app.post('/api/free-comment', async (req, res) => {
   runAutomationTask([link.trim()], [comment.trim()], [selectedProfile], 10);
 });
 
+app.post('/api/free-follower', async (req, res) => {
+  const { username } = req.body;
+  if (!username) {
+    return res.status(400).json({ error: 'Instagram username or profile link is required' });
+  }
+
+  const allProfiles = getProfiles();
+  let candidateProfiles = allProfiles.filter(p => p.name === 'profile_5' && p.isLoggedIn);
+  if (candidateProfiles.length === 0) {
+    candidateProfiles = allProfiles.filter(p => p.isLoggedIn && p.name !== 'profile_1' && p.name !== 'profile_2' && p.name !== 'profile_3');
+  }
+  if (candidateProfiles.length === 0) {
+    candidateProfiles = allProfiles.filter(p => p.isLoggedIn);
+  }
+  if (candidateProfiles.length === 0) {
+    return res.status(400).json({ error: 'No active accounts available right now. Please link an active account.' });
+  }
+
+  const selectedProfile = candidateProfiles[0].name;
+
+  if (currentJob.status === 'running') {
+    return res.json({ success: true, message: 'Follower order queued! Delivering shortly.' });
+  }
+
+  currentJob = {
+    id: Date.now().toString(),
+    status: 'running',
+    totalTasks: 1,
+    completedTasks: 0,
+    failedTasks: 0,
+    logs: [],
+    startTime: new Date().toISOString(),
+    stopRequested: false
+  };
+
+  res.json({ success: true, message: 'Follower order received! Delivering now...' });
+
+  runFollowAutomationTask(username.trim(), [selectedProfile]);
+});
+
+async function followUserOnPage(page, targetUser) {
+  addLog(`[+] Waiting for profile page to render...`, 'info');
+  await page.waitForTimeout(4000);
+
+  // Dismiss any popups or modals
+  try {
+    const closeBtn = page.locator('svg[aria-label="Close"], button:has(svg[aria-label="Close"]), div[role="dialog"] button').first();
+    if (await closeBtn.isVisible({ timeout: 2500 })) {
+      await closeBtn.click({ force: true });
+      addLog(`[✓] Dismissed popup dialog`, 'info');
+      await page.waitForTimeout(1000);
+    }
+  } catch (_) {}
+  await page.keyboard.press('Escape');
+
+  // Check if already following
+  try {
+    const followingBtn = page.locator('button:has-text("Following"), div[role="button"]:has-text("Following"), button:has-text("Requested")').first();
+    if (await followingBtn.isVisible({ timeout: 2000 })) {
+      addLog(`✅ Already following @${targetUser}!`, 'success');
+      return true;
+    }
+  } catch (_) {}
+
+  // Look for Follow button
+  let clicked = false;
+  const followSelectors = [
+    'header button:has-text("Follow")',
+    'button:has-text("Follow"):not(:has-text("Following"))',
+    'div[role="button"]:has-text("Follow"):not(:has-text("Following"))',
+    'button:has-text("Folgen")',
+    'button:has-text("Seguir")'
+  ];
+
+  for (const sel of followSelectors) {
+    try {
+      const btn = page.locator(sel).first();
+      if (await btn.isVisible({ timeout: 2000 })) {
+        await btn.click({ force: true });
+        clicked = true;
+        addLog(`[✓] Clicked Follow button for @${targetUser}!`, 'success');
+        break;
+      }
+    } catch (_) {}
+  }
+
+  if (!clicked) {
+    try {
+      await page.screenshot({ path: path.join(__dirname, 'public', 'last_error.png') });
+    } catch (_) {}
+    throw new Error(`Could not find Follow button for @${targetUser}. Check username.`);
+  }
+
+  await page.waitForTimeout(3000);
+  return true;
+}
+
 async function postCommentOnPage(page, commentText) {
   addLog(`[+] Waiting 5s for page to render...`, 'info');
   await page.waitForTimeout(5000);
@@ -494,6 +591,94 @@ async function runAutomationTask(links, comments, profiles, delaySec) {
     } catch (_) {}
     currentJob.status = currentJob.stopRequested ? 'stopped' : (currentJob.completedTasks > 0 ? 'completed' : 'failed');
     addLog(`Job finished! Completed: ${currentJob.completedTasks}, Failed: ${currentJob.failedTasks}`, currentJob.completedTasks > 0 ? 'success' : 'error');
+  }
+}
+
+async function runFollowAutomationTask(rawTarget, profiles) {
+  let username = rawTarget.trim();
+  username = username.replace(/^@/, '');
+  if (username.includes('instagram.com/')) {
+    const match = username.match(/instagram\.com\/([a-zA-Z0-9._]+)/);
+    if (match) username = match[1];
+  }
+  username = username.split('/')[0].split('?')[0];
+
+  addLog(`🚀 Follow task started for @${username} using ${profiles.length} accounts...`, 'info');
+
+  const browser = await chromium.launch({
+    headless: true,
+    args: [
+      '--disable-blink-features=AutomationControlled',
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-gpu'
+    ]
+  });
+
+  activeBrowserInstance = browser;
+
+  try {
+    for (let pIdx = 0; pIdx < profiles.length; pIdx++) {
+      const profileName = profiles[pIdx];
+      if (currentJob.stopRequested) break;
+
+      addLog(`👤 Launching profile: ${profileName}...`, 'info');
+      const userDataDir = path.resolve(__dirname, 'profiles', profileName);
+      const statePath = path.join(userDataDir, 'state.json');
+
+      const contextOpts = {
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+        viewport: { width: 1280, height: 800 },
+        extraHTTPHeaders: { 'Accept-Language': 'en-US,en;q=0.9' }
+      };
+
+      if (fs.existsSync(statePath)) {
+        contextOpts.storageState = statePath;
+      }
+
+      const context = await browser.newContext(contextOpts);
+
+      if (fs.existsSync(statePath)) {
+        try {
+          const stateData = JSON.parse(fs.readFileSync(statePath, 'utf8'));
+          if (stateData.cookies && Array.isArray(stateData.cookies)) {
+            await context.addCookies(stateData.cookies);
+            addLog(`[+] Loaded ${stateData.cookies.length} session cookies for ${profileName}`, 'info');
+          }
+        } catch (e) {}
+      }
+
+      const page = await context.newPage();
+      await page.addInitScript(() => {
+        Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+      });
+
+      try {
+        const profileUrl = `https://www.instagram.com/${username}/`;
+        addLog(`🔗 [${profileName}] Opening profile: ${profileUrl}`, 'info');
+        await page.goto(profileUrl, { waitUntil: 'domcontentloaded', timeout: 45000 });
+        await followUserOnPage(page, username);
+        currentJob.completedTasks++;
+        addLog(`✅ [${profileName}] Followed @${username} successfully!`, 'success');
+      } catch (err) {
+        currentJob.failedTasks++;
+        addLog(`❌ [${profileName}] Error: ${err.message}`, 'error');
+      }
+
+      try {
+        await Promise.race([context.close(), new Promise(r => setTimeout(r, 2000))]);
+      } catch (_) {}
+    }
+  } catch (err) {
+    addLog(`⚠️ Follow task interrupted: ${err.message}`, 'warning');
+  } finally {
+    activeBrowserInstance = null;
+    try {
+      await Promise.race([browser.close(), new Promise(r => setTimeout(r, 2000))]);
+    } catch (_) {}
+    currentJob.status = currentJob.stopRequested ? 'stopped' : (currentJob.completedTasks > 0 ? 'completed' : 'failed');
+    addLog(`🎉 Follow job finished! Completed: ${currentJob.completedTasks}, Failed: ${currentJob.failedTasks}`, currentJob.completedTasks > 0 ? 'success' : 'error');
   }
 }
 
