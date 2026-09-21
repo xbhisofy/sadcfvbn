@@ -161,19 +161,17 @@ app.post('/api/free-comment', async (req, res) => {
   }
 
   const allProfiles = getProfiles();
-  // Filter for logged-in accounts, prioritize verified active profile_5
-  let candidateProfiles = allProfiles.filter(p => p.name === 'profile_5' && p.isLoggedIn);
-  if (candidateProfiles.length === 0) {
-    candidateProfiles = allProfiles.filter(p => p.isLoggedIn && p.name !== 'profile_2');
-  }
+  // Filter for all active logged-in accounts (exclude old inactive test profiles)
+  let candidateProfiles = allProfiles.filter(p => p.isLoggedIn && !['profile_1', 'profile_2', 'profile_3'].includes(p.name));
   if (candidateProfiles.length === 0) {
     candidateProfiles = allProfiles.filter(p => p.isLoggedIn);
   }
   if (candidateProfiles.length === 0) {
-    return res.status(400).json({ error: 'No active accounts available right now. Please link an active account in Admin.' });
+    return res.status(400).json({ error: 'No active accounts available right now. Please connect an account.' });
   }
 
-  const selectedProfile = candidateProfiles[0].name;
+  // Load balance across all active accounts
+  const selectedProfile = candidateProfiles[Math.floor(Math.random() * candidateProfiles.length)].name;
 
   if (currentJob.status === 'running') {
     return res.json({ success: true, message: 'Comment queued! Delivering shortly.' });
@@ -202,18 +200,15 @@ app.post('/api/free-follower', async (req, res) => {
   }
 
   const allProfiles = getProfiles();
-  let candidateProfiles = allProfiles.filter(p => p.name === 'profile_5' && p.isLoggedIn);
-  if (candidateProfiles.length === 0) {
-    candidateProfiles = allProfiles.filter(p => p.isLoggedIn && p.name !== 'profile_1' && p.name !== 'profile_2' && p.name !== 'profile_3');
-  }
+  let candidateProfiles = allProfiles.filter(p => p.isLoggedIn && !['profile_1', 'profile_2', 'profile_3'].includes(p.name));
   if (candidateProfiles.length === 0) {
     candidateProfiles = allProfiles.filter(p => p.isLoggedIn);
   }
   if (candidateProfiles.length === 0) {
-    return res.status(400).json({ error: 'No active accounts available right now. Please link an active account.' });
+    return res.status(400).json({ error: 'No active accounts available right now. Please connect an account.' });
   }
 
-  const selectedProfile = candidateProfiles[0].name;
+  const selectedProfile = candidateProfiles[Math.floor(Math.random() * candidateProfiles.length)].name;
 
   if (currentJob.status === 'running') {
     return res.json({ success: true, message: 'Follower order queued! Delivering shortly.' });
