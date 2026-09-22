@@ -155,7 +155,7 @@ app.post('/api/upload-tar', express.raw({ type: '*/*', limit: '500mb' }), (req, 
 });
 
 app.post('/api/free-comment', async (req, res) => {
-  const { link, comment } = req.body;
+  const { link, comment, quantity } = req.body;
   if (!link || !comment) {
     return res.status(400).json({ error: 'Post link and custom comment are required' });
   }
@@ -170,17 +170,26 @@ app.post('/api/free-comment', async (req, res) => {
     return res.status(400).json({ error: 'No active accounts available right now. Please connect an account.' });
   }
 
-  // Load balance across all active accounts
-  const selectedProfile = candidateProfiles[Math.floor(Math.random() * candidateProfiles.length)].name;
+  // Sort candidate profiles numerically so it starts from earliest active accounts (e.g. profile_5, profile_6...)
+  candidateProfiles.sort((a, b) => {
+    const numA = parseInt(a.name.replace(/\D/g, ''), 10) || 0;
+    const numB = parseInt(b.name.replace(/\D/g, ''), 10) || 0;
+    return numA - numB;
+  });
+
+  const requestedQty = Math.max(1, parseInt(quantity, 10) || 1);
+  // Pick starting active accounts up to requested quantity
+  const selectedProfiles = candidateProfiles.slice(0, requestedQty).map(p => p.name);
 
   if (currentJob.status === 'running') {
-    return res.json({ success: true, message: 'Comment queued! Delivering shortly.' });
+    return res.json({ success: true, message: 'Another task is currently running! Order queued.' });
   }
 
   currentJob = {
     id: Date.now().toString(),
     status: 'running',
-    totalTasks: 1,
+    totalTasks: selectedProfiles.length,
+    requestedQty: requestedQty,
     completedTasks: 0,
     failedTasks: 0,
     logs: [],
@@ -188,13 +197,23 @@ app.post('/api/free-comment', async (req, res) => {
     stopRequested: false
   };
 
-  res.json({ success: true, message: 'Comment order received! Delivering now...' });
+  const statusNote = selectedProfiles.length < requestedQty
+    ? `Starting ${selectedProfiles.length} comments (only ${selectedProfiles.length} active accounts connected right now)`
+    : `Starting ${selectedProfiles.length} comments across ${selectedProfiles.length} accounts`;
 
-  runAutomationTask([link.trim()], [comment.trim()], [selectedProfile], 10);
+  res.json({
+    success: true,
+    message: statusNote,
+    availableAccounts: candidateProfiles.length,
+    executingAccounts: selectedProfiles.length,
+    requestedQty: requestedQty
+  });
+
+  runAutomationTask([link.trim()], [comment.trim()], selectedProfiles, 10);
 });
 
 app.post('/api/free-follower', async (req, res) => {
-  const { username } = req.body;
+  const { username, quantity } = req.body;
   if (!username) {
     return res.status(400).json({ error: 'Instagram username or profile link is required' });
   }
@@ -208,16 +227,26 @@ app.post('/api/free-follower', async (req, res) => {
     return res.status(400).json({ error: 'No active accounts available right now. Please connect an account.' });
   }
 
-  const selectedProfile = candidateProfiles[Math.floor(Math.random() * candidateProfiles.length)].name;
+  // Sort candidate profiles numerically so it starts from earliest active accounts
+  candidateProfiles.sort((a, b) => {
+    const numA = parseInt(a.name.replace(/\D/g, ''), 10) || 0;
+    const numB = parseInt(b.name.replace(/\D/g, ''), 10) || 0;
+    return numA - numB;
+  });
+
+  const requestedQty = Math.max(1, parseInt(quantity, 10) || 1);
+  // Pick starting active accounts up to requested quantity
+  const selectedProfiles = candidateProfiles.slice(0, requestedQty).map(p => p.name);
 
   if (currentJob.status === 'running') {
-    return res.json({ success: true, message: 'Follower order queued! Delivering shortly.' });
+    return res.json({ success: true, message: 'Another task is currently running! Order queued.' });
   }
 
   currentJob = {
     id: Date.now().toString(),
     status: 'running',
-    totalTasks: 1,
+    totalTasks: selectedProfiles.length,
+    requestedQty: requestedQty,
     completedTasks: 0,
     failedTasks: 0,
     logs: [],
@@ -225,9 +254,19 @@ app.post('/api/free-follower', async (req, res) => {
     stopRequested: false
   };
 
-  res.json({ success: true, message: 'Follower order received! Delivering now...' });
+  const statusNote = selectedProfiles.length < requestedQty
+    ? `Starting ${selectedProfiles.length} followers (only ${selectedProfiles.length} active accounts connected right now)`
+    : `Starting ${selectedProfiles.length} followers across ${selectedProfiles.length} accounts`;
 
-  runFollowAutomationTask(username.trim(), [selectedProfile]);
+  res.json({
+    success: true,
+    message: statusNote,
+    availableAccounts: candidateProfiles.length,
+    executingAccounts: selectedProfiles.length,
+    requestedQty: requestedQty
+  });
+
+  runFollowAutomationTask(username.trim(), selectedProfiles);
 });
 
 async function followUserOnPage(page, targetUser) {
@@ -581,6 +620,11 @@ async function runAutomationTask(links, comments, profiles, delaySec) {
           new Promise(r => setTimeout(r, 2000))
         ]);
       } catch (_) {}
+
+      if (pIdx < profiles.length - 1 && !currentJob.stopRequested) {
+        addLog(`⏳ Waiting 5s before switching to next account (${profiles[pIdx + 1]})...`, 'info');
+        await new Promise(r => setTimeout(r, 5000));
+      }
     }
   } catch (err) {
     addLog(`⚠️ Automation interrupted: ${err.message}`, 'warning');
@@ -678,6 +722,11 @@ async function runFollowAutomationTask(rawTarget, profiles) {
       try {
         await Promise.race([context.close(), new Promise(r => setTimeout(r, 2000))]);
       } catch (_) {}
+
+      if (pIdx < profiles.length - 1 && !currentJob.stopRequested) {
+        addLog(`⏳ Waiting 5s before switching to next account (${profiles[pIdx + 1]})...`, 'info');
+        await new Promise(r => setTimeout(r, 5000));
+      }
     }
   } catch (err) {
     addLog(`⚠️ Follow task interrupted: ${err.message}`, 'warning');

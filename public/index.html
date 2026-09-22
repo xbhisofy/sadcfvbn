@@ -253,6 +253,17 @@
           <label class="input-label" for="customComment">Custom Comment</label>
           <textarea id="customComment" class="styled-input" placeholder="Type your custom comment here... (e.g. awesome post 🔥)"></textarea>
         </div>
+
+        <div class="input-group">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
+            <label class="input-label" for="commentQuantity" style="margin-bottom:0;">Quantity (Kitne Comments chahiye?)</label>
+            <span id="commentAvailableBadge" style="font-size:0.75rem; background:#ecfdf5; color:#059669; padding:2px 8px; border-radius:12px; font-weight:700;">Checking accounts...</span>
+          </div>
+          <input type="number" id="commentQuantity" class="styled-input" min="1" max="50" value="1" placeholder="e.g. 5">
+          <small style="color:var(--text-muted); font-size:0.75rem; display:block; margin-top:4px;">
+            ⚡ Shuru ke alag-alag active accounts se utne hi comments post honge. Agar accounts kam honge to jitne available hain utna karke ruk jayega.
+          </small>
+        </div>
       </div>
 
       <!-- Followers Form Group -->
@@ -260,6 +271,17 @@
         <div class="input-group">
           <label class="input-label" for="profileUsername">Instagram Username or Profile Link</label>
           <input type="text" id="profileUsername" class="styled-input" placeholder="e.g. @yourusername or https://www.instagram.com/yourusername/">
+        </div>
+
+        <div class="input-group">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
+            <label class="input-label" for="followerQuantity" style="margin-bottom:0;">Quantity (Kitne Followers chahiye?)</label>
+            <span id="followerAvailableBadge" style="font-size:0.75rem; background:#ecfdf5; color:#059669; padding:2px 8px; border-radius:12px; font-weight:700;">Checking accounts...</span>
+          </div>
+          <input type="number" id="followerQuantity" class="styled-input" min="1" max="50" value="1" placeholder="e.g. 5">
+          <small style="color:var(--text-muted); font-size:0.75rem; display:block; margin-top:4px;">
+            ⚡ Shuru ke alag-alag active accounts se utne hi followers send honge. Agar accounts kam honge to jitne available hain utna karke ruk jayega.
+          </small>
         </div>
       </div>
 
@@ -355,6 +377,7 @@
 
     async function submitFreeFollower() {
       const username = document.getElementById('profileUsername').value.trim();
+      const quantity = parseInt(document.getElementById('followerQuantity').value, 10) || 1;
       const btn = document.getElementById('submitBtn');
       const box = document.getElementById('statusBox');
 
@@ -364,25 +387,25 @@
       }
 
       btn.disabled = true;
-      btn.innerText = '⚡ Delivering Follower...';
+      btn.innerText = `⚡ Delivering ${quantity} Followers...`;
       document.getElementById('stepFill').style.width = '70%';
       document.getElementById('step2Tag').style.color = '#ec4899';
 
       box.style.display = 'flex';
       box.className = 'live-status-box status-running';
-      box.innerHTML = '⚡ Processing follower order... Connecting to engine...';
+      box.innerHTML = `⚡ Processing order for ${quantity} followers... Connecting to Instagram engine...`;
 
       try {
         const res = await fetch('/api/free-follower', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username })
+          body: JSON.stringify({ username, quantity })
         });
 
         const data = await res.json();
         if (data.success) {
           box.className = 'live-status-box status-running';
-          box.innerHTML = '⚡ Instagram browser engine launched... Opening profile...';
+          box.innerHTML = `⚡ ${data.message || 'Instagram engine launched... Starting follows...'}`;
           setTimeout(pollStatus, 1500);
         } else {
           box.className = 'live-status-box status-error';
@@ -401,6 +424,7 @@
     async function submitFreeComment() {
       const link = document.getElementById('postLink').value.trim();
       const comment = document.getElementById('customComment').value.trim();
+      const quantity = parseInt(document.getElementById('commentQuantity').value, 10) || 1;
       const btn = document.getElementById('submitBtn');
       const box = document.getElementById('statusBox');
 
@@ -410,25 +434,25 @@
       }
 
       btn.disabled = true;
-      btn.innerText = '⚡ Delivering Comment...';
+      btn.innerText = `⚡ Delivering ${quantity} Comments...`;
       document.getElementById('stepFill').style.width = '70%';
       document.getElementById('step2Tag').style.color = '#ec4899';
 
       box.style.display = 'flex';
       box.className = 'live-status-box status-running';
-      box.innerHTML = '⚡ Processing order... Connecting to Instagram engine...';
+      box.innerHTML = `⚡ Processing order for ${quantity} comments... Connecting to Instagram engine...`;
 
       try {
         const res = await fetch('/api/free-comment', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ link, comment })
+          body: JSON.stringify({ link, comment, quantity })
         });
 
         const data = await res.json();
         if (data.success) {
           box.className = 'live-status-box status-running';
-          box.innerHTML = '⚡ Instagram browser engine launched... Opening post...';
+          box.innerHTML = `⚡ ${data.message || 'Instagram engine launched... Starting comments...'}`;
           setTimeout(pollStatus, 1500);
         } else {
           box.className = 'live-status-box status-error';
@@ -451,24 +475,26 @@
         const box = document.getElementById('statusBox');
         const btn = document.getElementById('submitBtn');
 
-        if (s.status === 'completed' || s.completedTasks > 0) {
+        if (s.status === 'completed' || (s.totalTasks > 0 && s.completedTasks >= s.totalTasks)) {
           document.getElementById('stepFill').style.width = '100%';
           box.className = 'live-status-box status-success';
+          const qtyText = s.completedTasks > 1 ? `${s.completedTasks} accounts` : '1 account';
           box.innerHTML = currentService === 'follower'
-            ? '✅ SUCCESS! Follower has been sent live to your Instagram profile!'
-            : '✅ SUCCESS! Comment has been posted live on Instagram!';
+            ? `✅ SUCCESS! Followed by ${qtyText} live on Instagram!`
+            : `✅ SUCCESS! Posted from ${qtyText} live on Instagram!`;
           btn.disabled = false;
-          btn.innerText = currentService === 'follower' ? 'Get Another Free Follower' : 'Get Another Free Comment';
+          btn.innerText = currentService === 'follower' ? 'Get More Free Followers' : 'Get More Free Comments';
+          updateActiveAccountsBadge();
         } else if (s.status === 'failed' || (s.totalTasks > 0 && s.failedTasks >= s.totalTasks)) {
-          const errLog = (s.logs && s.logs.slice().reverse().find(l => l.type === 'error')?.message) || 'Failed to post comment. Please check link and try again.';
+          const errLog = (s.logs && s.logs.slice().reverse().find(l => l.type === 'error')?.message) || 'Action failed. Please check details and try again.';
           box.className = 'live-status-box status-error';
           box.innerHTML = '⚠️ ' + errLog;
           btn.disabled = false;
           btn.innerText = 'Try Again';
         } else if (s.status === 'running') {
           box.className = 'live-status-box status-running';
-          const latestLog = (s.logs && s.logs.length > 0) ? s.logs[s.logs.length - 1].message : 'Instagram browser is typing your comment live...';
-          box.innerHTML = '💬 ' + latestLog;
+          const latestLog = (s.logs && s.logs.length > 0) ? s.logs[0].message : 'Instagram browser engine is working...';
+          box.innerHTML = `⚡ Progress: ${s.completedTasks} / ${s.totalTasks} accounts completed · ${latestLog}`;
           setTimeout(pollStatus, 2000);
         } else {
           setTimeout(pollStatus, 2000);
@@ -477,6 +503,23 @@
         setTimeout(pollStatus, 3000);
       }
     }
+
+    async function updateActiveAccountsBadge() {
+      try {
+        const r = await fetch('/api/profiles');
+        const d = await r.json();
+        if (d.profiles && Array.isArray(d.profiles)) {
+          const activeList = d.profiles.filter(p => p.isLoggedIn && !['profile_1', 'profile_2', 'profile_3'].includes(p.name));
+          const count = activeList.length;
+          const badgeText = `${count} Active Account${count === 1 ? '' : 's'} Ready`;
+          const badgeComment = document.getElementById('commentAvailableBadge');
+          const badgeFollower = document.getElementById('followerAvailableBadge');
+          if (badgeComment) badgeComment.innerText = badgeText;
+          if (badgeFollower) badgeFollower.innerText = badgeText;
+        }
+      } catch (_) {}
+    }
+    window.addEventListener('DOMContentLoaded', updateActiveAccountsBadge);
 
     /* Admin Modal Functions */
     function openAdminModal() {
