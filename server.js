@@ -25,6 +25,12 @@ let currentJob = {
   stopRequested: false
 };
 
+const indiaProxyConfig = {
+  server: 'http://as.rapidproxy.io:5001',
+  username: 's4chizw-residential-IN',
+  password: 's4chizwhy'
+};
+
 function addLog(message, type = 'info') {
   const timestamp = new Date().toLocaleTimeString();
   const logEntry = { timestamp, message, type };
@@ -527,10 +533,11 @@ app.post('/api/start-job', async (req, res) => {
 });
 
 async function runAutomationTask(links, comments, profiles, delaySec) {
-  addLog(`🚀 Job started (${links.length} links x ${profiles.length} profiles)...`, 'info');
+  addLog(`🚀 Job started (${links.length} links x ${profiles.length} profiles) via India Residential Proxy...`, 'info');
 
   const browser = await chromium.launch({
     headless: true,
+    proxy: indiaProxyConfig,
     args: [
       '--disable-blink-features=AutomationControlled',
       '--no-sandbox',
@@ -547,7 +554,7 @@ async function runAutomationTask(links, comments, profiles, delaySec) {
       const profileName = profiles[pIdx];
       if (currentJob.stopRequested) break;
 
-      addLog(`👤 Launching profile: ${profileName}...`, 'info');
+      addLog(`👤 Launching profile: ${profileName} [🛡️ India Residential IP]...`, 'info');
       const userDataDir = path.resolve(__dirname, 'profiles', profileName);
       const statePath = path.join(userDataDir, 'state.json');
 
@@ -564,6 +571,9 @@ async function runAutomationTask(links, comments, profiles, delaySec) {
       }
 
       const context = await browser.newContext(contextOpts);
+
+      // Block heavy images/videos to conserve proxy bandwidth and maximize speed
+      await context.route('**/*.{png,jpg,jpeg,webp,mp4,mp3,avi,woff,woff2}', route => route.abort());
 
       if (fs.existsSync(statePath)) {
         try {
@@ -650,10 +660,11 @@ async function runFollowAutomationTask(rawTarget, profiles) {
   }
   username = username.split('/')[0].split('?')[0];
 
-  addLog(`🚀 Follow task started for @${username} using ${profiles.length} accounts...`, 'info');
+  addLog(`🚀 Follow task started for @${username} using ${profiles.length} accounts via India Residential Proxy...`, 'info');
 
   const browser = await chromium.launch({
     headless: true,
+    proxy: indiaProxyConfig,
     args: [
       '--disable-blink-features=AutomationControlled',
       '--no-sandbox',
@@ -670,7 +681,7 @@ async function runFollowAutomationTask(rawTarget, profiles) {
       const profileName = profiles[pIdx];
       if (currentJob.stopRequested) break;
 
-      addLog(`👤 Launching profile: ${profileName}...`, 'info');
+      addLog(`👤 Launching profile: ${profileName} [🛡️ India Residential IP]...`, 'info');
       const userDataDir = path.resolve(__dirname, 'profiles', profileName);
       const statePath = path.join(userDataDir, 'state.json');
 
@@ -685,6 +696,9 @@ async function runFollowAutomationTask(rawTarget, profiles) {
       }
 
       const context = await browser.newContext(contextOpts);
+
+      // Block heavy images/videos to conserve proxy bandwidth and maximize speed
+      await context.route('**/*.{png,jpg,jpeg,webp,mp4,mp3,avi,woff,woff2}', route => route.abort());
 
       if (fs.existsSync(statePath)) {
         try {
