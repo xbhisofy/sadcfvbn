@@ -47,7 +47,7 @@ function getProfiles() {
   }
 
   const dirs = fs.readdirSync(profilesDir).filter(file => {
-    if (!file || file.includes('\0') || file.includes('..')) return false;
+    if (!file || !/^profile_\d+$/.test(file)) return false;
     try {
       return fs.statSync(path.join(profilesDir, file)).isDirectory();
     } catch (_) {
