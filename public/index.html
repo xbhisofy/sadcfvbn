@@ -1075,12 +1075,22 @@
         const r = await fetch('/api/profiles');
         const d = await r.json();
         if (d.profiles && d.profiles.length > 0) {
-          document.getElementById('accountsList').innerHTML = d.profiles.map(p => `
-            <div style="font-size:0.85rem; padding:6px; border-bottom:1px solid #eee; display:flex; justify-content:space-between;">
-              <span><strong>${p.name}</strong> (${p.username ? '@' + p.username : 'No handle'})</span>
-              <span style="color:${p.isLoggedIn ? '#059669' : '#dc2626'}; font-weight:700;">${p.isLoggedIn ? 'Active' : 'Offline'}</span>
-            </div>
-          `).join('');
+          document.getElementById('accountsList').innerHTML = d.profiles.map(p => {
+            const isSusp = p.status === 'suspended';
+            const isReady = p.isLoggedIn && !isSusp;
+            const badgeColor = isSusp ? '#d97706' : (isReady ? '#059669' : '#dc2626');
+            const badgeText = isSusp ? '⚠️ Suspended / Filtered' : (isReady ? 'Active' : 'Offline');
+            const reason = p.error ? `<div style="font-size:0.75rem; color:#d97706; margin-top:2px;">Reason: ${p.error}</div>` : '';
+            return `
+              <div style="font-size:0.85rem; padding:6px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                  <strong>${p.name}</strong> (${p.username ? '@' + p.username : 'No handle'})
+                  ${reason}
+                </div>
+                <span style="color:${badgeColor}; font-weight:700; white-space:nowrap; margin-left:10px;">${badgeText}</span>
+              </div>
+            `;
+          }).join('');
         }
       } catch(e) {}
     }

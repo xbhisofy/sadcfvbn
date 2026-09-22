@@ -98,14 +98,23 @@ function getProfiles() {
     const statePath = path.join(pPath, 'state.json');
     let username = name;
     let isLoggedIn = fs.existsSync(statePath) || fs.existsSync(infoPath);
+    let status = 'ready';
+    let error = null;
     if (fs.existsSync(infoPath)) {
       try {
         const data = JSON.parse(fs.readFileSync(infoPath, 'utf8'));
         if (data.username) username = data.username;
         if (typeof data.isLoggedIn === 'boolean') isLoggedIn = data.isLoggedIn;
+        if (data.status) status = data.status;
+        if (data.error) error = data.error;
       } catch (_) {}
     }
-    return { name, username, isLoggedIn };
+    const dbAcc = db.data.accounts[name];
+    if (dbAcc) {
+      if (dbAcc.status) status = dbAcc.status;
+      if (dbAcc.error_reason) error = dbAcc.error_reason;
+    }
+    return { name, username, isLoggedIn, status, error };
   });
 }
 
@@ -713,7 +722,7 @@ app.get('/api/inspect', (req, res) => {
 app.get('/api/status', (req, res) => {
   const queueStats = db.getOrderStats();
   const accounts = Object.values(db.data.accounts);
-  const activeCount = accounts.filter(a => a.is_active && a.status !== 'error').length;
+  const activeCount = accounts.filter(a => a.is_active && a.status !== 'error' && a.status !== 'suspended').length;
   const activeOrder = db.getNextPendingOrder();
 
   res.json({

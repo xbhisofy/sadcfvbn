@@ -345,7 +345,7 @@ export async function startQueueWorker() {
 
       // Multi-Cycle Round-Robin Rotation for Orders with Quantity > Account Count
       const activePool = Object.values(db.data.accounts)
-        .filter(a => a.is_active && a.status !== 'offline' && a.status !== 'error')
+        .filter(a => a.is_active && a.status !== 'offline' && a.status !== 'error' && a.status !== 'suspended')
         .map(a => a.profile_name);
       
       const poolSize = activePool.length || 1;
@@ -354,14 +354,16 @@ export async function startQueueWorker() {
       const completedInCurrentCycle = order.completed_count % poolSize;
       const cycleStartIndex = order.completed_count - completedInCurrentCycle;
       const excludedInCurrentCycle = (order.assigned_accounts || []).slice(cycleStartIndex);
+      const failedAccounts = order.failed_accounts || [];
+      const totalExcluded = [...new Set([...excludedInCurrentCycle, ...failedAccounts])];
 
-      let account = db.getEligibleAccount(excludedInCurrentCycle);
+      let account = db.getEligibleAccount(totalExcluded);
 
-      // If all accounts have acted in this cycle, or accounts are in cooldown
+      // If all accounts have acted in this cycle, or accounts are in cooldown, try any eligible non-failed account
       if (!account) {
-        const anyAccount = db.getEligibleAccount([]);
+        const anyAccount = db.getEligibleAccount(failedAccounts);
         if (!anyAccount) {
-          workerLog(`⏳ Order #${order.id} (${order.completed_count}/${order.quantity}): All accounts are resting in cooldown. Waiting 15s...`, 'info');
+          workerLog(`⏳ Order #${order.id} (${order.completed_count}/${order.quantity}): All healthy accounts are resting in cooldown. Waiting 15s...`, 'info');
           await new Promise(r => setTimeout(r, 15000));
           continue;
         } else {
@@ -400,21 +402,58 @@ export async function startQueueWorker() {
         workerLog(`⚠️ Action failed on ${account.profile_name} for Order #${order.id}: ${result.error}`, 'warning');
         db.recordAccountAction(account.profile_name, false);
 
-        if (result.error && (result.error.includes('session expired') || result.error.includes('logged out'))) {
+        const errorMsg = (result.error || '').toLowerCase();
+        const isAccountDead = 
+          errorMsg.includes('session expired') || 
+          errorMsg.includes('logged out') ||
+          errorMsg.includes('suspended') ||
+          errorMsg.includes('challenge') ||
+          errorMsg.includes('checkpoint') ||
+          errorMsg.includes('compromised') ||
+          errorMsg.includes('disabled');
+
+        if (isAccountDead) {
           db.markAccountError(account.profile_name, result.error);
+          workerLog(`🛡️ [Auto-Filter] Account ${account.profile_name} marked as suspended (${result.error}). Isolated from pool!`, 'warning');
+        }
+
+        // Exclude this bad account from this order so we don't loop on it
+        const failedAccs = [...new Set([...(order.failed_accounts || []), account.profile_name])];
+
+        // Check if there are other healthy accounts available in pool
+        const remainingHealthyAccounts = Object.values(db.data.accounts).filter(a => 
+          a.is_active && 
+          a.status !== 'offline' && 
+          a.status !== 'error' && 
+          a.status !== 'suspended' && 
+          !failedAccs.includes(a.profile_name)
+        );
+
+        if (isAccountDead && remainingHealthyAccounts.length > 0) {
+          // Instantly switch to next healthy account without burning order retries!
+          workerLog(`🔄 [Auto-Switch] Order #${order.id}: Bypassing dead ${account.profile_name} -> Switching to remaining ${remainingHealthyAccounts.length} healthy accounts!`, 'info');
+          db.updateOrder(order.id, {
+            failed_accounts: failedAccs,
+            error: `Auto-switched from ${account.profile_name} (${result.error})`
+          });
+          await new Promise(r => setTimeout(r, 3000));
+          continue;
         }
 
         // Check if retry is feasible
         const retries = (order.retries || 0) + 1;
-        if (retries > 5) {
+        if (retries > 5 || (isAccountDead && remainingHealthyAccounts.length === 0)) {
           db.updateOrder(order.id, {
             status: order.completed_count > 0 ? 'partial' : 'failed',
-            error: result.error,
-            retries
+            error: remainingHealthyAccounts.length === 0 && isAccountDead 
+              ? `All available accounts suspended or exhausted: ${result.error}` 
+              : result.error,
+            retries,
+            failed_accounts: failedAccs
           });
-          workerLog(`❌ Order #${order.id} permanently failed after ${retries} attempts: ${result.error}`, 'error');
+          workerLog(`❌ Order #${order.id} stopped after ${retries} attempts: ${result.error}`, 'error');
         } else {
-          db.updateOrder(order.id, { retries, error: result.error });
+          db.updateOrder(order.id, { retries, error: result.error, failed_accounts: failedAccs });
           // Wait 5s before next attempt
           await new Promise(r => setTimeout(r, 5000));
         }

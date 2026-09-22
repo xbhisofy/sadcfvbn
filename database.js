@@ -224,11 +224,17 @@ class Database {
           status: p.isLoggedIn ? 'ready' : 'offline'
         };
       } else {
-        this.data.accounts[p.name].is_active = p.isLoggedIn;
-        if (p.username) this.data.accounts[p.name].username = p.username;
-        if (!p.isLoggedIn) this.data.accounts[p.name].status = 'offline';
-        else if (this.data.accounts[p.name].status === 'offline') {
-          this.data.accounts[p.name].status = 'ready';
+        // If account was quarantined as suspended or error, don't resurrect it unless explicitly re-authenticated
+        const currentStatus = this.data.accounts[p.name].status;
+        if ((currentStatus === 'suspended' || currentStatus === 'error') && !p.isLoggedIn) {
+          this.data.accounts[p.name].is_active = false;
+        } else {
+          this.data.accounts[p.name].is_active = p.isLoggedIn;
+          if (p.username) this.data.accounts[p.name].username = p.username;
+          if (!p.isLoggedIn) this.data.accounts[p.name].status = 'offline';
+          else if (this.data.accounts[p.name].status === 'offline') {
+            this.data.accounts[p.name].status = 'ready';
+          }
         }
       }
 
@@ -251,7 +257,7 @@ class Database {
     const cooldownMs = (this.data.settings.accountCooldownSeconds || 300) * 1000;
 
     const candidates = Object.values(this.data.accounts).filter(acc => {
-      if (!acc.is_active || acc.status === 'offline' || acc.status === 'error') return false;
+      if (!acc.is_active || acc.status === 'offline' || acc.status === 'error' || acc.status === 'suspended') return false;
       if (excludedAccountNames.includes(acc.profile_name)) return false;
 
       // Check daily reset
@@ -311,9 +317,25 @@ class Database {
   markAccountError(profileName, errorReason) {
     const acc = this.data.accounts[profileName];
     if (!acc) return;
-    acc.status = 'error';
+    acc.status = 'suspended';
+    acc.is_active = false;
     acc.error_reason = errorReason;
     this.save();
+
+    // Persist to account.json on disk so disk sync never resurrects it
+    try {
+      const accPath = path.join(__dirname, 'profiles', profileName, 'account.json');
+      let data = {};
+      if (fs.existsSync(accPath)) {
+        try { data = JSON.parse(fs.readFileSync(accPath, 'utf8')); } catch (_) {}
+      }
+      data.isLoggedIn = false;
+      data.status = 'suspended';
+      data.error = errorReason;
+      fs.writeFileSync(accPath, JSON.stringify(data, null, 2), 'utf8');
+    } catch (e) {
+      console.error(`Failed to write account.json for ${profileName}:`, e.message);
+    }
   }
 }
 
