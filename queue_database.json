@@ -1,6 +1,6 @@
 {
   "nextUserId": 4,
-  "nextOrderId": 10009,
+  "nextOrderId": 10013,
   "users": [
     {
       "id": 1,
@@ -169,6 +169,81 @@
       "created_at": "2026-09-22T17:38:08.175Z",
       "updated_at": "2026-09-22T17:38:28.861Z",
       "error": null
+    },
+    {
+      "id": 10009,
+      "user_id": null,
+      "api_key": null,
+      "service_type": "comment",
+      "target": "https://www.instagram.com/reel/DUdSSKTk8G0/?stkn=MXF4bTNrN2U0aWwyMw==",
+      "content": "M\nO\nN\nE\nY\nB\nO\nS\nS\nJ\nI\nA\nU\nR\nA",
+      "quantity": 15,
+      "completed_count": 4,
+      "status": "partial",
+      "assigned_accounts": [
+        "profile_14",
+        "profile_18",
+        "profile_19",
+        "profile_6"
+      ],
+      "source": "web",
+      "created_at": "2026-09-22T17:58:51.027Z",
+      "updated_at": "2026-09-22T18:04:57.799Z",
+      "error": "Instagram account session expired or logged out.",
+      "retries": 6
+    },
+    {
+      "id": 10010,
+      "user_id": null,
+      "api_key": null,
+      "service_type": "follower",
+      "target": "https://www.instagram.com/xbhiblackbox?stkn=MTVqdnJ3enBxNGlqeA==",
+      "content": "",
+      "quantity": 6,
+      "completed_count": 0,
+      "status": "failed",
+      "assigned_accounts": [],
+      "source": "web",
+      "created_at": "2026-09-22T18:20:07.470Z",
+      "updated_at": "2026-09-22T18:22:40.667Z",
+      "error": "Could not find Follow button for @https:. Check username.",
+      "retries": 6
+    },
+    {
+      "id": 10011,
+      "user_id": 2,
+      "api_key": "whop_fc6df59a716ebf49dcfe0609f3f0405c",
+      "service_type": "comment",
+      "target": "https://www.instagram.com/reel/DaMg0ZMMV3b/",
+      "content": "Superb Work",
+      "quantity": 1,
+      "completed_count": 1,
+      "status": "completed",
+      "assigned_accounts": [
+        "profile_19"
+      ],
+      "source": "smm_panel",
+      "created_at": "2026-09-22T18:27:36.729Z",
+      "updated_at": "2026-09-22T18:27:58.783Z",
+      "error": null
+    },
+    {
+      "id": 10012,
+      "user_id": null,
+      "api_key": null,
+      "service_type": "follower",
+      "target": "https://www.instagram.com/xbhiblackbox?stkn=MTVqdnJ3enBxNGlqeA==",
+      "content": "",
+      "quantity": 1,
+      "completed_count": 1,
+      "status": "completed",
+      "assigned_accounts": [
+        "profile_20"
+      ],
+      "source": "web",
+      "created_at": "2026-09-22T18:28:49.721Z",
+      "updated_at": "2026-09-22T18:29:03.517Z",
+      "error": null
     }
   ],
   "accounts": {
@@ -208,17 +283,18 @@
       "is_active": true,
       "actions_today": 3,
       "total_actions": 3,
-      "last_action_at": "2026-09-22T17:03:06.028Z",
+      "last_action_at": "2026-09-22T18:04:57.798Z",
       "last_reset_date": "2026-09-22",
-      "status": "ready"
+      "status": "error",
+      "error_reason": "Instagram account session expired or logged out."
     },
     "profile_6": {
       "profile_name": "profile_6",
       "username": "xbhiblackbox",
       "is_active": true,
-      "actions_today": 3,
-      "total_actions": 3,
-      "last_action_at": "2026-09-22T16:52:30.207Z",
+      "actions_today": 4,
+      "total_actions": 4,
+      "last_action_at": "2026-09-22T18:04:20.437Z",
       "last_reset_date": "2026-09-22",
       "status": "ready"
     },
@@ -228,7 +304,7 @@
       "is_active": true,
       "actions_today": 3,
       "total_actions": 3,
-      "last_action_at": "2026-09-22T17:13:27.618Z",
+      "last_action_at": "2026-09-22T18:20:31.619Z",
       "last_reset_date": "2026-09-22",
       "status": "ready"
     },
@@ -238,17 +314,88 @@
       "is_active": true,
       "actions_today": 1,
       "total_actions": 1,
-      "last_action_at": "2026-09-22T17:38:28.861Z",
+      "last_action_at": "2026-09-22T18:20:51.214Z",
       "last_reset_date": "2026-09-22",
-      "status": "cooldown"
+      "status": "ready"
     },
     "profile_14": {
       "profile_name": "profile_14",
       "username": "annmorales4398",
       "is_active": true,
+      "actions_today": 1,
+      "total_actions": 1,
+      "last_action_at": "2026-09-22T18:21:09.132Z",
+      "last_reset_date": "2026-09-22",
+      "status": "ready"
+    },
+    "profile_15": {
+      "profile_name": "profile_15",
+      "username": "profile_15",
+      "is_active": true,
       "actions_today": 0,
       "total_actions": 0,
-      "last_action_at": null,
+      "last_action_at": "2026-09-22T17:59:55.084Z",
+      "last_reset_date": "2026-09-22",
+      "status": "error",
+      "error_reason": "Instagram account session expired or logged out."
+    },
+    "profile_16": {
+      "profile_name": "profile_16",
+      "username": "profile_16",
+      "is_active": true,
+      "actions_today": 0,
+      "total_actions": 0,
+      "last_action_at": "2026-09-22T18:21:35.048Z",
+      "last_reset_date": "2026-09-22",
+      "status": "ready"
+    },
+    "profile_17": {
+      "profile_name": "profile_17",
+      "username": "paigeknox638",
+      "is_active": true,
+      "actions_today": 0,
+      "total_actions": 0,
+      "last_action_at": "2026-09-22T18:22:13.622Z",
+      "last_reset_date": "2026-09-22",
+      "status": "ready"
+    },
+    "profile_18": {
+      "profile_name": "profile_18",
+      "username": "vivianreed2513",
+      "is_active": true,
+      "actions_today": 1,
+      "total_actions": 1,
+      "last_action_at": "2026-09-22T18:22:40.667Z",
+      "last_reset_date": "2026-09-22",
+      "status": "ready"
+    },
+    "profile_19": {
+      "profile_name": "profile_19",
+      "username": "autumnfaye467",
+      "is_active": true,
+      "actions_today": 2,
+      "total_actions": 2,
+      "last_action_at": "2026-09-22T18:27:58.782Z",
+      "last_reset_date": "2026-09-22",
+      "status": "cooldown"
+    },
+    "profile_20": {
+      "profile_name": "profile_20",
+      "username": "aliyahmoss81545",
+      "is_active": true,
+      "actions_today": 1,
+      "total_actions": 1,
+      "last_action_at": "2026-09-22T18:29:03.516Z",
+      "last_reset_date": "2026-09-22",
+      "status": "cooldown"
+    },
+    "profile_21": {
+      "profile_name": "profile_21",
+      "username": "kayleebrown3249",
+      "is_active": true,
+      "actions_today": 0,
+      "total_actions": 0,
+      "last_action_at": "2026-09-22T18:03:53.794Z",
       "last_reset_date": "2026-09-22",
       "status": "ready"
     }

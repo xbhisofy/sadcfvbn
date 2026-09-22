@@ -39,6 +39,18 @@ function cleanInstagramUrl(url) {
   }
 }
 
+function extractInstagramUsername(input) {
+  if (!input) return '';
+  let str = input.trim();
+  str = str.split('?')[0].split('#')[0];
+  if (str.includes('instagram.com/')) {
+    const after = str.split('instagram.com/')[1];
+    const parts = after.split('/').filter(Boolean);
+    return parts[0] || '';
+  }
+  return str.replace(/^@+/, '').replace(/^\/+|\/+$/g, '').split('/')[0].trim();
+}
+
 async function safeGoto(page, url, maxRetries = 2) {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
@@ -289,7 +301,10 @@ async function executeOrderAction(order, account) {
       await postCommentOnPage(page, commentToSend);
       workerLog(`✅ [${account.profile_name}] Comment delivered for Order #${order.id}!`, 'success');
     } else {
-      const cleanUser = order.target.trim().replace(/^@/, '').split('/')[0].split('?')[0];
+      const cleanUser = extractInstagramUsername(order.target);
+      if (!cleanUser) {
+        throw new Error(`Invalid Instagram username or profile link: ${order.target}`);
+      }
       const profileUrl = `https://www.instagram.com/${cleanUser}/`;
       workerLog(`🔗 [${account.profile_name}] Navigating to: ${profileUrl}`, 'info');
       await safeGoto(page, profileUrl, 3);
