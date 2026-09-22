@@ -1,6 +1,6 @@
 {
   "nextUserId": 4,
-  "nextOrderId": 10014,
+  "nextOrderId": 10016,
   "users": [
     {
       "id": 1,
@@ -262,6 +262,44 @@
       "created_at": "2026-09-22T18:30:12.445Z",
       "updated_at": "2026-09-22T18:30:36.090Z",
       "error": null
+    },
+    {
+      "id": 10014,
+      "user_id": 3,
+      "api_key": "whop_4aef1db2ad6f2dfefa352baf93d2b348",
+      "service_type": "comment",
+      "target": "https://www.instagram.com/reel/DdmYOkuR1iq/?stkn=MTlncGFocTk1Z251Mw==",
+      "content": "Awesome post 🔥",
+      "quantity": 1,
+      "completed_count": 1,
+      "status": "completed",
+      "assigned_accounts": [
+        "profile_6"
+      ],
+      "source": "smm_panel",
+      "created_at": "2026-09-22T19:23:29.556Z",
+      "updated_at": "2026-09-22T19:23:51.931Z",
+      "error": null
+    },
+    {
+      "id": 10015,
+      "user_id": 2,
+      "api_key": "whop_fc6df59a716ebf49dcfe0609f3f0405c",
+      "service_type": "comment",
+      "target": "https://www.instagram.com/reel/DaMg0ZMMV3b/",
+      "content": "First custom comment 🔥\nSecond custom comment ❤️\nThird custom comment 🚀",
+      "quantity": 3,
+      "completed_count": 0,
+      "status": "in_progress",
+      "assigned_accounts": [],
+      "source": "smm_panel",
+      "created_at": "2026-09-22T19:32:20.259Z",
+      "updated_at": "2026-09-22T19:32:52.575Z",
+      "error": "Could not locate comment input. Ensure account is logged into Instagram and post allows comments.",
+      "retries": 1,
+      "failed_accounts": [
+        "profile_11"
+      ]
     }
   ],
   "accounts": {
@@ -310,9 +348,9 @@
       "profile_name": "profile_6",
       "username": "xbhiblackbox",
       "is_active": true,
-      "actions_today": 4,
-      "total_actions": 4,
-      "last_action_at": "2026-09-22T18:04:20.437Z",
+      "actions_today": 5,
+      "total_actions": 5,
+      "last_action_at": "2026-09-22T19:23:51.930Z",
       "last_reset_date": "2026-09-22",
       "status": "ready"
     },
@@ -322,7 +360,7 @@
       "is_active": true,
       "actions_today": 3,
       "total_actions": 3,
-      "last_action_at": "2026-09-22T18:20:31.619Z",
+      "last_action_at": "2026-09-22T19:32:47.573Z",
       "last_reset_date": "2026-09-22",
       "status": "ready"
     },
@@ -395,7 +433,7 @@
       "total_actions": 2,
       "last_action_at": "2026-09-22T18:27:58.782Z",
       "last_reset_date": "2026-09-22",
-      "status": "cooldown"
+      "status": "ready"
     },
     "profile_20": {
       "profile_name": "profile_20",
@@ -405,7 +443,7 @@
       "total_actions": 1,
       "last_action_at": "2026-09-22T18:29:03.516Z",
       "last_reset_date": "2026-09-22",
-      "status": "cooldown"
+      "status": "ready"
     },
     "profile_21": {
       "profile_name": "profile_21",
@@ -415,7 +453,7 @@
       "total_actions": 1,
       "last_action_at": "2026-09-22T18:30:36.090Z",
       "last_reset_date": "2026-09-22",
-      "status": "cooldown"
+      "status": "ready"
     }
   },
   "settings": {

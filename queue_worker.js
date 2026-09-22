@@ -158,7 +158,11 @@ async function postCommentOnPage(page, commentText) {
   }
 
   workerLog(`[+] Typing comment: "${commentText}"...`, 'info');
-  await page.keyboard.type(commentText, { delay: 60 });
+  try {
+    await page.keyboard.insertText(commentText);
+  } catch (_) {
+    await page.keyboard.type(commentText, { delay: 60 });
+  }
   await page.waitForTimeout(1500);
 
   // Try post button
@@ -291,10 +295,11 @@ async function executeOrderAction(order, account) {
       await safeGoto(page, targetUrl, 3);
 
       let commentToSend = order.content || 'Awesome post 🔥';
-      if (order.content && order.content.includes('\n')) {
-        const lines = order.content.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+      if (order.content && (order.content.includes('\n') || order.content.includes('\r'))) {
+        const lines = order.content.split(/\r\n|\r|\n/).map(s => s.trim()).filter(Boolean);
         if (lines.length > 0) {
           commentToSend = lines[order.completed_count % lines.length] || lines[0];
+          workerLog(`💬 [Custom Comment ${order.completed_count + 1}/${lines.length}] Selected: "${commentToSend}"`, 'info');
         }
       }
 

@@ -342,18 +342,29 @@ app.all('/api/v2', (req, res) => {
     const service = parseInt(params.service, 10);
     const link = (params.link || '').trim();
     let quantity = parseInt(params.quantity, 10);
-    const comments = (params.comments || params.comment || '').trim();
+    let rawComments = params.comments || params.comment || params.custom_comments || params.custom_comment || '';
+    if (Array.isArray(rawComments)) {
+      rawComments = rawComments.join('\n');
+    }
+    if (typeof rawComments === 'string') {
+      if (rawComments.includes('\\n') && !rawComments.includes('\n')) {
+        rawComments = rawComments.replace(/\\r\\n|\\r|\\n/g, '\n');
+      }
+    }
+    const comments = String(rawComments || '').trim();
 
     if (!link) {
       return res.json({ error: 'link parameter is required' });
     }
 
     let order;
-    if (service === 1 || (!service && comments) || (service !== 2 && comments)) {
+    if (service === 1 || (!service && comments) || (service !== 2 && comments) || String(params.service).toLowerCase().includes('comment')) {
       // SERVICE 1: INSTAGRAM CUSTOM COMMENTS (Min: 1)
-      const commentLines = comments ? comments.split(/\r?\n/).map(c => c.trim()).filter(Boolean) : [];
+      const commentLines = comments ? comments.split(/\r\n|\r|\n/).map(c => c.trim()).filter(Boolean) : [];
       if (!quantity || isNaN(quantity) || quantity < 1) {
         quantity = commentLines.length > 0 ? commentLines.length : 1;
+      } else if (commentLines.length > 0 && quantity < commentLines.length) {
+        quantity = commentLines.length;
       }
       const finalComment = comments || 'Awesome post 🔥';
 
@@ -366,6 +377,7 @@ app.all('/api/v2', (req, res) => {
         user_id: user.id,
         api_key: user.api_key
       });
+      addLog(`📥 [SMM API v2] Order #${order.id} [CUSTOM COMMENTS x ${quantity}] received for ${link}`, 'info');
     } else {
       // SERVICE 2: INSTAGRAM REAL FOLLOWERS (Min: 1)
       if (!quantity || isNaN(quantity) || quantity < 1) {
