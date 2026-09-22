@@ -284,26 +284,32 @@ app.all('/api/v2', (req, res) => {
   const action = (params.action || '').toLowerCase();
   const apiKey = (params.key || '').trim();
 
-  // 1. Services List (Standard SMM protocol)
+  // 1. Services List (Standard SMM protocol for importing into external panels)
   if (action === 'services') {
     return res.json([
       {
         service: 1,
-        name: 'Instagram Custom Comments (Safe Multi-Account Pool)',
+        name: 'Instagram Custom Comments (Safe Rotating Indian Residential Pool)',
         type: 'Custom Comments',
         category: 'Instagram Comments',
         rate: '0.00',
         min: 1,
-        max: 1000
+        max: 1000,
+        dripfeed: false,
+        refill: false,
+        cancel: false
       },
       {
         service: 2,
-        name: 'Instagram Real Followers (Safe Multi-Account Pool)',
+        name: 'Instagram Real Followers (Safe Rotating Indian Residential Pool)',
         type: 'Default',
         category: 'Instagram Followers',
         rate: '0.00',
         min: 1,
-        max: 1000
+        max: 1000,
+        dripfeed: false,
+        refill: false,
+        cancel: false
       }
     ]);
   }
@@ -322,32 +328,40 @@ app.all('/api/v2', (req, res) => {
     return res.json({ balance: '10000.00', currency: 'INR' });
   }
 
-  // 3. Add Order
+  // 3. Add Order (Service 1 = Comments, Service 2 = Followers)
   if (action === 'add') {
-    const service = parseInt(params.service, 10) || 1;
-    const link = params.link;
-    const quantity = Math.max(1, parseInt(params.quantity, 10) || 1);
-    const comments = params.comments || params.comment || '';
+    const service = parseInt(params.service, 10);
+    const link = (params.link || '').trim();
+    let quantity = parseInt(params.quantity, 10);
+    const comments = (params.comments || params.comment || '').trim();
 
     if (!link) {
       return res.json({ error: 'link parameter is required' });
     }
 
     let order;
-    if (service === 1 || comments) {
-      if (!comments) {
-        return res.json({ error: 'comments parameter is required for custom comments' });
+    if (service === 1 || (!service && comments) || (service !== 2 && comments)) {
+      // SERVICE 1: INSTAGRAM CUSTOM COMMENTS (Min: 1)
+      const commentLines = comments ? comments.split(/\r?\n/).map(c => c.trim()).filter(Boolean) : [];
+      if (!quantity || isNaN(quantity) || quantity < 1) {
+        quantity = commentLines.length > 0 ? commentLines.length : 1;
       }
+      const finalComment = comments || 'Awesome post 🔥';
+
       order = db.createOrder({
         service_type: 'comment',
         target: link,
-        content: comments,
+        content: finalComment,
         quantity: quantity,
         source: 'smm_panel',
         user_id: user.id,
         api_key: user.api_key
       });
     } else {
+      // SERVICE 2: INSTAGRAM REAL FOLLOWERS (Min: 1)
+      if (!quantity || isNaN(quantity) || quantity < 1) {
+        quantity = 1;
+      }
       order = db.createOrder({
         service_type: 'follower',
         target: link,
@@ -358,11 +372,11 @@ app.all('/api/v2', (req, res) => {
       });
     }
 
-    addLog(`📥 [SMM API] Order #${order.id} received from User #${user.id} (${user.email})! [${order.service_type.toUpperCase()} x ${order.quantity}] -> ${order.target}`, 'info');
+    addLog(`📥 [SMM API] Order #${order.id} received from User #${user.id} (${user.email})! [SERVICE ${service || (order.service_type === 'comment' ? 1 : 2)}: ${order.service_type.toUpperCase()} x ${order.quantity}] -> ${order.target}`, 'info');
     return res.json({ order: order.id });
   }
 
-  // 4. Order Status
+  // 4. Order Status & Live Tracking
   if (action === 'status') {
     if (params.order) {
       const order = db.getOrder(params.order);
@@ -376,11 +390,13 @@ app.all('/api/v2', (req, res) => {
       else if (order.status === 'failed') statusStr = 'Canceled';
       else if (order.status === 'partial') statusStr = 'Partial';
 
+      const remains = String(Math.max(0, order.quantity - order.completed_count));
+
       return res.json({
         charge: '0.00',
-        start_count: 0,
+        start_count: '0',
         status: statusStr,
-        remains: Math.max(0, order.quantity - order.completed_count),
+        remains: remains,
         currency: 'INR'
       });
     }
@@ -400,11 +416,13 @@ app.all('/api/v2', (req, res) => {
         else if (order.status === 'failed') statusStr = 'Canceled';
         else if (order.status === 'partial') statusStr = 'Partial';
 
+        const remains = String(Math.max(0, order.quantity - order.completed_count));
+
         out[id] = {
           charge: '0.00',
-          start_count: 0,
+          start_count: '0',
           status: statusStr,
-          remains: Math.max(0, order.quantity - order.completed_count),
+          remains: remains,
           currency: 'INR'
         };
       }

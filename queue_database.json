@@ -1,6 +1,6 @@
 {
-  "nextUserId": 2,
-  "nextOrderId": 10003,
+  "nextUserId": 3,
+  "nextOrderId": 10004,
   "users": [
     {
       "id": 1,
@@ -8,6 +8,13 @@
       "password_hash": "46890078b89300cae73186035a7bba67:3fdbee42ccf5c7ccae21c1e61e3602d05c14eb6ac75602cd95259f1c3c8edb581bd4e59ceea03ee42613d7c5a9d03a18d2f86344669b9358d36f21dbd686b2fa",
       "api_key": "whop_5f5ed9943db82e0bef480c425d71145a",
       "created_at": "2026-09-22T13:49:35.690Z"
+    },
+    {
+      "id": 2,
+      "email": "xbhishekh@gmail.com",
+      "password_hash": "29e46424a57a696cfb9e3f6803aa33d5:eeaf1b3c410698d928f77a20f6c8f5d15faad1140252711bd0b5de730238af517deba3c2b719f109da7df45c1e170d61bd5d6b7c228a066465f34ad29bb94c59",
+      "api_key": "whop_fc6df59a716ebf49dcfe0609f3f0405c",
+      "created_at": "2026-09-22T14:03:35.040Z"
     }
   ],
   "orders": [
@@ -43,6 +50,24 @@
       "source": "smm_panel",
       "created_at": "2026-09-22T13:49:37.956Z",
       "updated_at": "2026-09-22T13:50:05.766Z",
+      "error": null
+    },
+    {
+      "id": 10003,
+      "user_id": 2,
+      "api_key": "whop_fc6df59a716ebf49dcfe0609f3f0405c",
+      "service_type": "comment",
+      "target": "https://www.instagram.com/reel/DaMg0ZMMV3b/",
+      "content": "Superb Work",
+      "quantity": 1,
+      "completed_count": 1,
+      "status": "completed",
+      "assigned_accounts": [
+        "profile_11"
+      ],
+      "source": "smm_panel",
+      "created_at": "2026-09-22T14:09:20.493Z",
+      "updated_at": "2026-09-22T14:09:47.686Z",
       "error": null
     }
   ],
@@ -94,6 +119,16 @@
       "actions_today": 1,
       "total_actions": 1,
       "last_action_at": "2026-09-22T13:50:05.766Z",
+      "last_reset_date": "2026-09-22",
+      "status": "ready"
+    },
+    "profile_11": {
+      "profile_name": "profile_11",
+      "username": "lucasbennettoff58",
+      "is_active": true,
+      "actions_today": 1,
+      "total_actions": 1,
+      "last_action_at": "2026-09-22T14:09:47.686Z",
       "last_reset_date": "2026-09-22",
       "status": "cooldown"
     }

@@ -277,7 +277,16 @@ async function executeOrderAction(order, account) {
       const targetUrl = cleanInstagramUrl(order.target);
       workerLog(`🔗 [${account.profile_name}] Navigating to: ${targetUrl}`, 'info');
       await safeGoto(page, targetUrl, 3);
-      await postCommentOnPage(page, order.content);
+
+      let commentToSend = order.content || 'Awesome post 🔥';
+      if (order.content && order.content.includes('\n')) {
+        const lines = order.content.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+        if (lines.length > 0) {
+          commentToSend = lines[order.completed_count % lines.length] || lines[0];
+        }
+      }
+
+      await postCommentOnPage(page, commentToSend);
       workerLog(`✅ [${account.profile_name}] Comment delivered for Order #${order.id}!`, 'success');
     } else {
       const cleanUser = order.target.trim().replace(/^@/, '').split('/')[0].split('?')[0];
