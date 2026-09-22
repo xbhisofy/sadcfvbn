@@ -328,15 +328,30 @@ export async function startQueueWorker() {
         continue;
       }
 
-      // Get list of accounts already used for this order
-      const alreadyUsed = order.assigned_accounts || [];
-      const account = db.getEligibleAccount(alreadyUsed);
+      // Multi-Cycle Round-Robin Rotation for Orders with Quantity > Account Count
+      const activePool = Object.values(db.data.accounts)
+        .filter(a => a.is_active && a.status !== 'offline' && a.status !== 'error')
+        .map(a => a.profile_name);
+      
+      const poolSize = activePool.length || 1;
+      
+      // Calculate which accounts have already acted in the current round/cycle
+      const completedInCurrentCycle = order.completed_count % poolSize;
+      const cycleStartIndex = order.completed_count - completedInCurrentCycle;
+      const excludedInCurrentCycle = (order.assigned_accounts || []).slice(cycleStartIndex);
 
+      let account = db.getEligibleAccount(excludedInCurrentCycle);
+
+      // If all accounts have acted in this cycle, or accounts are in cooldown
       if (!account) {
-        // All accounts are either resting in cooldown or exceeded daily quota
-        // Wait 10 seconds before polling again
-        await new Promise(r => setTimeout(r, 10000));
-        continue;
+        const anyAccount = db.getEligibleAccount([]);
+        if (!anyAccount) {
+          workerLog(`⏳ Order #${order.id} (${order.completed_count}/${order.quantity}): All accounts are resting in cooldown. Waiting 15s...`, 'info');
+          await new Promise(r => setTimeout(r, 15000));
+          continue;
+        } else {
+          account = anyAccount;
+        }
       }
 
       // Mark order in progress
@@ -360,10 +375,12 @@ export async function startQueueWorker() {
 
         if (isDone) {
           workerLog(`🎉 Order #${order.id} [${order.service_type}] fully completed (${newCompleted}/${order.quantity})!`, 'success');
+        } else {
+          // Safe human-like interval between comments (20 to 35 seconds)
+          const safeDelayMs = Math.floor(20000 + Math.random() * 15000);
+          workerLog(`⏳ [Safety Engine] Delivered (${newCompleted}/${order.quantity}). Waiting ${Math.round(safeDelayMs / 1000)}s safe interval before next account...`, 'info');
+          await new Promise(r => setTimeout(r, safeDelayMs));
         }
-
-        // Polite delay before pulling next queue task
-        await new Promise(r => setTimeout(r, 8000));
       } else {
         workerLog(`⚠️ Action failed on ${account.profile_name} for Order #${order.id}: ${result.error}`, 'warning');
         db.recordAccountAction(account.profile_name, false);
