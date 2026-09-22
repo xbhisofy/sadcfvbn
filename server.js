@@ -25,11 +25,39 @@ let currentJob = {
   stopRequested: false
 };
 
-const indiaProxyConfig = {
-  server: 'http://as.rapidproxy.io:5001',
-  username: 's4chizw-residential-IN',
-  password: 's4chizwhy'
-};
+function getProxyForProfile(profileName, jobRunId) {
+  // Rapidproxy session ID must be between 4 and 12 chars
+  const num = profileName.replace(/[^0-9]/g, '') || '1';
+  const runTag = jobRunId || String(Date.now()).slice(-4);
+  const cleanId = `p${num}_${runTag}`.slice(0, 10);
+  return {
+    server: 'http://as.rapidproxy.io:5001',
+    username: `s4chizw-residential-IN-session-${cleanId}`,
+    password: 's4chizwhy'
+  };
+}
+
+function cleanInstagramUrl(url) {
+  try {
+    const u = new URL(url.trim());
+    return `${u.protocol}//${u.host}${u.pathname}`;
+  } catch (_) {
+    return url.trim().split('?')[0];
+  }
+}
+
+async function safeGoto(page, url, maxRetries = 2) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      await page.goto(url, { waitUntil: 'commit', timeout: 35000 });
+      return true;
+    } catch (e) {
+      if (attempt >= maxRetries) throw e;
+      addLog(`⚠️ Connection glitch (${e.message.split('\n')[0]}). Retrying...`, 'warning');
+      await page.waitForTimeout(2000);
+    }
+  }
+}
 
 function addLog(message, type = 'info') {
   const timestamp = new Date().toLocaleTimeString();
@@ -277,7 +305,10 @@ app.post('/api/free-follower', async (req, res) => {
 
 async function followUserOnPage(page, targetUser) {
   addLog(`[+] Waiting for profile page to render...`, 'info');
-  await page.waitForTimeout(4000);
+  try {
+    await page.locator('header, main, section, [role="main"]').first().waitFor({ timeout: 15000 });
+  } catch (_) {}
+  await page.waitForTimeout(3000);
 
   if (page.url().includes('/accounts/login') || page.url().includes('/accounts/suspended')) {
     throw new Error('Instagram account session expired or logged out. Please update account session in Admin.');
@@ -374,11 +405,26 @@ async function postCommentOnPage(page, commentText) {
 
   // Click comment icon if present (especially on Reels layout)
   try {
-    const commentIcon = page.locator('svg[aria-label="Comment"], svg[aria-label="Kommentieren"], div[role="button"]:has(svg[aria-label="Comment"])').first();
-    if (await commentIcon.isVisible({ timeout: 3500 })) {
-      await commentIcon.click({ force: true });
-      addLog(`[✓] Clicked comment icon`, 'info');
-      await page.waitForTimeout(2500);
+    const clicked = await page.evaluate(() => {
+      const svgs = Array.from(document.querySelectorAll('svg[aria-label="Comment"], svg[aria-label="Comments"], svg[aria-label*="comment"i]'));
+      for (const svg of svgs) {
+        const rect = svg.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0 && rect.top >= 0 && rect.top <= window.innerHeight) {
+          const clickable = svg.closest('div[role="button"]') || svg.closest('button') || svg.parentElement || svg;
+          clickable.click();
+          return true;
+        }
+      }
+      if (svgs.length > 0) {
+        const clickable = svgs[0].closest('div[role="button"]') || svgs[0].parentElement || svgs[0];
+        clickable.click();
+        return true;
+      }
+      return false;
+    });
+    if (clicked) {
+      addLog(`[✓] Clicked visible comment icon!`, 'info');
+      await page.waitForTimeout(3000);
     }
   } catch (_) {}
 
@@ -414,13 +460,16 @@ async function postCommentOnPage(page, commentText) {
 
     if (!focused) {
       try {
-        const placeholderText = page.getByText(/Add a comment/i).first();
-        if (await placeholderText.isVisible({ timeout: 1000 })) {
-          await placeholderText.click({ force: true });
-          focused = true;
-          addLog(`[✓] Focused comment box via placeholder text`, 'info');
-          break;
-        }
+        await page.evaluate(() => {
+          const svgs = Array.from(document.querySelectorAll('svg[aria-label="Comment"], svg[aria-label="Comments"], svg[aria-label*="comment"i]'));
+          for (const svg of svgs) {
+            const rect = svg.getBoundingClientRect();
+            if (rect.width > 0 && rect.height > 0 && rect.top >= 0 && rect.top <= window.innerHeight) {
+              (svg.closest('div[role="button"]') || svg.closest('button') || svg.parentElement || svg).click();
+              return;
+            }
+          }
+        });
       } catch (_) {}
       await page.waitForTimeout(1000);
     }
@@ -533,11 +582,11 @@ app.post('/api/start-job', async (req, res) => {
 });
 
 async function runAutomationTask(links, comments, profiles, delaySec) {
+  const jobRunId = Math.floor(1000 + Math.random() * 9000);
   addLog(`🚀 Job started (${links.length} links x ${profiles.length} profiles) via India Residential Proxy...`, 'info');
 
   const browser = await chromium.launch({
     headless: true,
-    proxy: indiaProxyConfig,
     args: [
       '--disable-blink-features=AutomationControlled',
       '--no-sandbox',
@@ -554,13 +603,15 @@ async function runAutomationTask(links, comments, profiles, delaySec) {
       const profileName = profiles[pIdx];
       if (currentJob.stopRequested) break;
 
-      addLog(`👤 Launching profile: ${profileName} [🛡️ India Residential IP]...`, 'info');
+      const profileProxy = getProxyForProfile(profileName, jobRunId);
+      addLog(`👤 Launching profile: ${profileName} [🛡️ India Residential IP via ${profileProxy.username}]...`, 'info');
       const userDataDir = path.resolve(__dirname, 'profiles', profileName);
       const statePath = path.join(userDataDir, 'state.json');
 
       const contextOpts = {
         userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
         viewport: { width: 1280, height: 800 },
+        proxy: profileProxy,
         extraHTTPHeaders: {
           'Accept-Language': 'en-US,en;q=0.9'
         }
@@ -572,8 +623,8 @@ async function runAutomationTask(links, comments, profiles, delaySec) {
 
       const context = await browser.newContext(contextOpts);
 
-      // Block heavy images/videos to conserve proxy bandwidth and maximize speed
-      await context.route('**/*.{png,jpg,jpeg,webp,mp4,mp3,avi,woff,woff2}', route => route.abort());
+      // Block heavy video streams to conserve bandwidth without breaking React hydration
+      await context.route('**/*.{mp4,webm,avi}', route => route.abort());
 
       if (fs.existsSync(statePath)) {
         try {
@@ -593,22 +644,18 @@ async function runAutomationTask(links, comments, profiles, delaySec) {
         Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
       });
 
-      try {
-        addLog(`🌐 Priming session on Instagram home...`, 'info');
-        await page.goto('https://www.instagram.com/', { waitUntil: 'domcontentloaded', timeout: 30000 });
-        await page.waitForTimeout(3000);
-      } catch (_) {}
-
       for (let lIdx = 0; lIdx < links.length; lIdx++) {
         if (currentJob.stopRequested) break;
 
-        const link = links[lIdx];
+        const rawLink = links[lIdx];
+        const link = cleanInstagramUrl(rawLink);
         const commentText = comments[(lIdx + pIdx) % comments.length];
 
         addLog(`🔗 [${profileName}] Opening: ${link}`, 'info');
 
         try {
-          await page.goto(link, { waitUntil: 'domcontentloaded', timeout: 45000 });
+          await safeGoto(page, link, 2);
+          await page.waitForTimeout(3000);
           addLog(`💬 [${profileName}] Commenting: "${commentText}"`, 'info');
           await postCommentOnPage(page, commentText);
           currentJob.completedTasks++;
@@ -660,11 +707,11 @@ async function runFollowAutomationTask(rawTarget, profiles) {
   }
   username = username.split('/')[0].split('?')[0];
 
-  addLog(`🚀 Follow task started for @${username} using ${profiles.length} accounts via India Residential Proxy...`, 'info');
+  const jobRunId = Math.floor(1000 + Math.random() * 9000);
+  addLog(`🚀 Follow job started for @${username} (${profiles.length} profiles) via India Residential Proxy...`, 'info');
 
   const browser = await chromium.launch({
     headless: true,
-    proxy: indiaProxyConfig,
     args: [
       '--disable-blink-features=AutomationControlled',
       '--no-sandbox',
@@ -681,13 +728,15 @@ async function runFollowAutomationTask(rawTarget, profiles) {
       const profileName = profiles[pIdx];
       if (currentJob.stopRequested) break;
 
-      addLog(`👤 Launching profile: ${profileName} [🛡️ India Residential IP]...`, 'info');
+      const profileProxy = getProxyForProfile(profileName, jobRunId);
+      addLog(`👤 Launching profile: ${profileName} [🛡️ India Residential IP via ${profileProxy.username}]...`, 'info');
       const userDataDir = path.resolve(__dirname, 'profiles', profileName);
       const statePath = path.join(userDataDir, 'state.json');
 
       const contextOpts = {
         userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
         viewport: { width: 1280, height: 800 },
+        proxy: profileProxy,
         extraHTTPHeaders: { 'Accept-Language': 'en-US,en;q=0.9' }
       };
 
@@ -697,8 +746,8 @@ async function runFollowAutomationTask(rawTarget, profiles) {
 
       const context = await browser.newContext(contextOpts);
 
-      // Block heavy images/videos to conserve proxy bandwidth and maximize speed
-      await context.route('**/*.{png,jpg,jpeg,webp,mp4,mp3,avi,woff,woff2}', route => route.abort());
+      // Block heavy video streams to conserve bandwidth without breaking React hydration
+      await context.route('**/*.{mp4,webm,avi}', route => route.abort());
 
       if (fs.existsSync(statePath)) {
         try {
@@ -716,18 +765,14 @@ async function runFollowAutomationTask(rawTarget, profiles) {
       });
 
       try {
-        addLog(`🌐 Priming session on Instagram home...`, 'info');
-        await page.goto('https://www.instagram.com/', { waitUntil: 'domcontentloaded', timeout: 30000 });
-        await page.waitForTimeout(3000);
-      } catch (_) {}
-
-      try {
-        const profileUrl = `https://www.instagram.com/${username}/`;
+        const cleanUser = username.trim().replace(/^@/, '').split('/')[0];
+        const profileUrl = `https://www.instagram.com/${cleanUser}/`;
         addLog(`🔗 [${profileName}] Opening profile: ${profileUrl}`, 'info');
-        await page.goto(profileUrl, { waitUntil: 'domcontentloaded', timeout: 45000 });
-        await followUserOnPage(page, username);
+        await safeGoto(page, profileUrl, 2);
+        await page.waitForTimeout(3000);
+        await followUserOnPage(page, cleanUser);
         currentJob.completedTasks++;
-        addLog(`✅ [${profileName}] Followed @${username} successfully!`, 'success');
+        addLog(`✅ [${profileName}] Followed @${cleanUser} successfully!`, 'success');
       } catch (err) {
         currentJob.failedTasks++;
         addLog(`❌ [${profileName}] Error: ${err.message}`, 'error');
