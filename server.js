@@ -207,14 +207,84 @@ app.post('/api/upload-tar', express.raw({ type: '*/*', limit: '500mb' }), (req, 
 });
 
 // ==========================================
-// 🚀 SMM PANEL STANDARD API (v2)
+// 👤 USER AUTHENTICATION & DASHBOARD API
+// ==========================================
+app.post('/api/auth/register', (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password are required' });
+    }
+    const user = db.createUser(email, password);
+    addLog(`👤 [AUTH] New user registered: ${user.email} (ID: ${user.id})`, 'info');
+    res.json({ success: true, user });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/auth/login', (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password are required' });
+    }
+    const user = db.authenticateUser(email, password);
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+    addLog(`👤 [AUTH] User logged in: ${user.email} (ID: ${user.id})`, 'info');
+    res.json({ success: true, user });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+function extractApiKey(req) {
+  const authHeader = req.headers['authorization'];
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    return authHeader.slice(7).trim();
+  }
+  return req.headers['x-api-key'] || req.query.key || req.body?.key || null;
+}
+
+app.get('/api/user/profile', (req, res) => {
+  const key = extractApiKey(req);
+  if (!key) return res.status(401).json({ error: 'API key is required' });
+  const user = db.getUserByApiKey(key);
+  if (!user) return res.status(401).json({ error: 'Invalid API key' });
+  res.json({ success: true, user });
+});
+
+app.post('/api/user/regenerate-key', (req, res) => {
+  const key = extractApiKey(req);
+  if (!key) return res.status(401).json({ error: 'API key is required' });
+  const user = db.getUserByApiKey(key);
+  if (!user) return res.status(401).json({ error: 'Invalid API key' });
+  const newKey = db.regenerateApiKey(user.id);
+  addLog(`🔑 [AUTH] Regenerated API key for User #${user.id} (${user.email})`, 'info');
+  res.json({ success: true, api_key: newKey });
+});
+
+app.get('/api/user/orders', (req, res) => {
+  const key = extractApiKey(req);
+  if (!key) return res.status(401).json({ error: 'API key is required' });
+  const user = db.getUserByApiKey(key);
+  if (!user) return res.status(401).json({ error: 'Invalid API key' });
+  const orders = db.getUserOrders(user.id);
+  res.json({ success: true, orders });
+});
+
+// ==========================================
+// 🚀 SMM PANEL STANDARD API (v2) - MOTHER PROVIDER
 // Compatible with Perfect Panel, SmartPanel, etc.
 // ==========================================
 app.all('/api/v2', (req, res) => {
   const params = { ...req.query, ...req.body };
   const action = (params.action || '').toLowerCase();
+  const apiKey = (params.key || '').trim();
 
-  // 1. Services List
+  // 1. Services List (Standard SMM protocol)
   if (action === 'services') {
     return res.json([
       {
@@ -236,6 +306,15 @@ app.all('/api/v2', (req, res) => {
         max: 1000
       }
     ]);
+  }
+
+  // Key validation for other actions
+  if (!apiKey) {
+    return res.json({ error: 'Incorrect request: API key is required' });
+  }
+  const user = db.getUserByApiKey(apiKey);
+  if (!user) {
+    return res.json({ error: 'Incorrect request: Invalid API key' });
   }
 
   // 2. Balance Check
@@ -264,18 +343,22 @@ app.all('/api/v2', (req, res) => {
         target: link,
         content: comments,
         quantity: quantity,
-        source: 'smm_panel'
+        source: 'smm_panel',
+        user_id: user.id,
+        api_key: user.api_key
       });
     } else {
       order = db.createOrder({
         service_type: 'follower',
         target: link,
         quantity: quantity,
-        source: 'smm_panel'
+        source: 'smm_panel',
+        user_id: user.id,
+        api_key: user.api_key
       });
     }
 
-    addLog(`📥 [SMM API] Order #${order.id} received! [${order.service_type.toUpperCase()} x ${order.quantity}] -> ${order.target}`, 'info');
+    addLog(`📥 [SMM API] Order #${order.id} received from User #${user.id} (${user.email})! [${order.service_type.toUpperCase()} x ${order.quantity}] -> ${order.target}`, 'info');
     return res.json({ order: order.id });
   }
 
@@ -283,7 +366,9 @@ app.all('/api/v2', (req, res) => {
   if (action === 'status') {
     if (params.order) {
       const order = db.getOrder(params.order);
-      if (!order) return res.json({ error: 'Incorrect order ID' });
+      if (!order || (order.user_id && order.user_id !== user.id)) {
+        return res.json({ error: 'Incorrect order ID' });
+      }
 
       let statusStr = 'Pending';
       if (order.status === 'completed') statusStr = 'Completed';
@@ -305,7 +390,7 @@ app.all('/api/v2', (req, res) => {
       const out = {};
       for (const id of ids) {
         const order = db.getOrder(id);
-        if (!order) {
+        if (!order || (order.user_id && order.user_id !== user.id)) {
           out[id] = { error: 'Incorrect order ID' };
           continue;
         }

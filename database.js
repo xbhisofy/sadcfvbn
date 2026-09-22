@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -8,10 +9,33 @@ const __dirname = path.dirname(__filename);
 const DB_FILE = path.join(__dirname, 'queue_database.json');
 const LOCK_FILE = path.join(__dirname, 'queue_database.json.tmp');
 
+function hashPassword(password) {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.scryptSync(password, salt, 64).toString('hex');
+  return `${salt}:${hash}`;
+}
+
+function verifyPassword(password, stored) {
+  try {
+    if (!stored || !stored.includes(':')) return false;
+    const [salt, hash] = stored.split(':');
+    const verifyHash = crypto.scryptSync(password, salt, 64).toString('hex');
+    return crypto.timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(verifyHash, 'hex'));
+  } catch (_) {
+    return false;
+  }
+}
+
+function generateApiKey() {
+  return 'whop_' + crypto.randomBytes(16).toString('hex');
+}
+
 class Database {
   constructor() {
     this.data = {
+      nextUserId: 1,
       nextOrderId: 10001,
+      users: [],
       orders: [],
       accounts: {},
       settings: {
@@ -29,6 +53,8 @@ class Database {
         const raw = fs.readFileSync(DB_FILE, 'utf8');
         const parsed = JSON.parse(raw);
         this.data = { ...this.data, ...parsed };
+        if (!Array.isArray(this.data.users)) this.data.users = [];
+        if (!this.data.nextUserId) this.data.nextUserId = 1;
       } else {
         this.save();
       }
@@ -52,12 +78,87 @@ class Database {
     return new Date().toISOString().split('T')[0];
   }
 
+  // --- USER AUTHENTICATION & MANAGEMENT ---
+
+  sanitizeUser(user) {
+    if (!user) return null;
+    return {
+      id: user.id,
+      email: user.email,
+      api_key: user.api_key,
+      created_at: user.created_at
+    };
+  }
+
+  createUser(email, password) {
+    if (!email || !password) throw new Error('Email and password are required');
+    const normEmail = email.trim().toLowerCase();
+    if (!normEmail.includes('@') || normEmail.length < 5) throw new Error('Invalid email format');
+    if (password.length < 4) throw new Error('Password must be at least 4 characters');
+
+    const existing = this.data.users.find(u => u.email === normEmail);
+    if (existing) throw new Error('An account with this email already exists');
+
+    const user = {
+      id: this.data.nextUserId++,
+      email: normEmail,
+      password_hash: hashPassword(password),
+      api_key: generateApiKey(),
+      created_at: new Date().toISOString()
+    };
+
+    this.data.users.push(user);
+    this.save();
+    return this.sanitizeUser(user);
+  }
+
+  authenticateUser(email, password) {
+    if (!email || !password) return null;
+    const normEmail = email.trim().toLowerCase();
+    const user = this.data.users.find(u => u.email === normEmail);
+    if (!user) return null;
+
+    if (verifyPassword(password, user.password_hash)) {
+      return this.sanitizeUser(user);
+    }
+    return null;
+  }
+
+  getUserByApiKey(apiKey) {
+    if (!apiKey) return null;
+    const cleanKey = apiKey.trim();
+    const user = this.data.users.find(u => u.api_key === cleanKey);
+    return user ? this.sanitizeUser(user) : null;
+  }
+
+  getUserById(id) {
+    const numId = parseInt(id, 10);
+    const user = this.data.users.find(u => u.id === numId);
+    return user ? this.sanitizeUser(user) : null;
+  }
+
+  regenerateApiKey(userId) {
+    const numId = parseInt(userId, 10);
+    const user = this.data.users.find(u => u.id === numId);
+    if (!user) throw new Error('User not found');
+
+    user.api_key = generateApiKey();
+    this.save();
+    return user.api_key;
+  }
+
+  getUserOrders(userId) {
+    const numId = parseInt(userId, 10);
+    return this.data.orders.filter(o => o.user_id === numId).slice().reverse();
+  }
+
   // --- ORDER MANAGEMENT ---
 
-  createOrder({ service_type, target, content = '', quantity = 1, source = 'api' }) {
-    const today = this.getTodayStr();
+  createOrder({ service_type, target, content = '', quantity = 1, source = 'api', user_id = null, api_key = null }) {
     const order = {
       id: this.data.nextOrderId++,
+      user_id: user_id ? parseInt(user_id, 10) : null,
+      api_key: api_key || null,
       service_type: service_type.toLowerCase(), // 'comment' | 'follower'
       target: target.trim(),
       content: content ? content.trim() : '',
