@@ -4,6 +4,8 @@ import fs from 'fs';
 import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import { chromium } from 'playwright';
+import { db } from './database.js';
+import { startQueueWorker, setLogCallback } from './queue_worker.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -12,6 +14,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json({ limit: '100mb' }));
+app.use(express.urlencoded({ extended: true, limit: '100mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 let currentJob = {
@@ -106,6 +109,21 @@ function getProfiles() {
   });
 }
 
+function syncAccountsWithDb() {
+  try {
+    const profiles = getProfiles();
+    db.syncAccountsFromDisk(profiles);
+  } catch (e) {
+    console.error('⚠️ Error syncing accounts with DB:', e.message);
+  }
+}
+syncAccountsWithDb();
+setInterval(syncAccountsWithDb, 30000);
+
+// Connect queue worker logging to live dashboard
+setLogCallback((msg, type) => addLog(msg, type));
+startQueueWorker();
+
 function parseCookieHeader(cookieStr) {
   const cookies = [];
   const parts = cookieStr.split(';');
@@ -188,62 +206,157 @@ app.post('/api/upload-tar', express.raw({ type: '*/*', limit: '500mb' }), (req, 
   }
 });
 
+// ==========================================
+// 🚀 SMM PANEL STANDARD API (v2)
+// Compatible with Perfect Panel, SmartPanel, etc.
+// ==========================================
+app.all('/api/v2', (req, res) => {
+  const params = { ...req.query, ...req.body };
+  const action = (params.action || '').toLowerCase();
+
+  // 1. Services List
+  if (action === 'services') {
+    return res.json([
+      {
+        service: 1,
+        name: 'Instagram Custom Comments (Safe Multi-Account Pool)',
+        type: 'Custom Comments',
+        category: 'Instagram Comments',
+        rate: '0.00',
+        min: 1,
+        max: 1000
+      },
+      {
+        service: 2,
+        name: 'Instagram Real Followers (Safe Multi-Account Pool)',
+        type: 'Default',
+        category: 'Instagram Followers',
+        rate: '0.00',
+        min: 1,
+        max: 1000
+      }
+    ]);
+  }
+
+  // 2. Balance Check
+  if (action === 'balance') {
+    return res.json({ balance: '10000.00', currency: 'INR' });
+  }
+
+  // 3. Add Order
+  if (action === 'add') {
+    const service = parseInt(params.service, 10) || 1;
+    const link = params.link;
+    const quantity = Math.max(1, parseInt(params.quantity, 10) || 1);
+    const comments = params.comments || params.comment || '';
+
+    if (!link) {
+      return res.json({ error: 'link parameter is required' });
+    }
+
+    let order;
+    if (service === 1 || comments) {
+      if (!comments) {
+        return res.json({ error: 'comments parameter is required for custom comments' });
+      }
+      order = db.createOrder({
+        service_type: 'comment',
+        target: link,
+        content: comments,
+        quantity: quantity,
+        source: 'smm_panel'
+      });
+    } else {
+      order = db.createOrder({
+        service_type: 'follower',
+        target: link,
+        quantity: quantity,
+        source: 'smm_panel'
+      });
+    }
+
+    addLog(`📥 [SMM API] Order #${order.id} received! [${order.service_type.toUpperCase()} x ${order.quantity}] -> ${order.target}`, 'info');
+    return res.json({ order: order.id });
+  }
+
+  // 4. Order Status
+  if (action === 'status') {
+    if (params.order) {
+      const order = db.getOrder(params.order);
+      if (!order) return res.json({ error: 'Incorrect order ID' });
+
+      let statusStr = 'Pending';
+      if (order.status === 'completed') statusStr = 'Completed';
+      else if (order.status === 'in_progress') statusStr = 'In progress';
+      else if (order.status === 'failed') statusStr = 'Canceled';
+      else if (order.status === 'partial') statusStr = 'Partial';
+
+      return res.json({
+        charge: '0.00',
+        start_count: 0,
+        status: statusStr,
+        remains: Math.max(0, order.quantity - order.completed_count),
+        currency: 'INR'
+      });
+    }
+
+    if (params.orders) {
+      const ids = String(params.orders).split(',').map(s => s.trim());
+      const out = {};
+      for (const id of ids) {
+        const order = db.getOrder(id);
+        if (!order) {
+          out[id] = { error: 'Incorrect order ID' };
+          continue;
+        }
+        let statusStr = 'Pending';
+        if (order.status === 'completed') statusStr = 'Completed';
+        else if (order.status === 'in_progress') statusStr = 'In progress';
+        else if (order.status === 'failed') statusStr = 'Canceled';
+        else if (order.status === 'partial') statusStr = 'Partial';
+
+        out[id] = {
+          charge: '0.00',
+          start_count: 0,
+          status: statusStr,
+          remains: Math.max(0, order.quantity - order.completed_count),
+          currency: 'INR'
+        };
+      }
+      return res.json(out);
+    }
+
+    return res.json({ error: 'order parameter is required' });
+  }
+
+  return res.json({ error: 'Unknown action' });
+});
+
+// ==========================================
+// 🌐 WEB UI QUEUE ENDPOINTS
+// ==========================================
 app.post('/api/free-comment', async (req, res) => {
   const { link, comment, quantity } = req.body;
   if (!link || !comment) {
     return res.status(400).json({ error: 'Post link and custom comment are required' });
   }
 
-  const allProfiles = getProfiles();
-  // Filter for all active logged-in accounts (exclude old inactive test profiles)
-  let candidateProfiles = allProfiles.filter(p => p.isLoggedIn && !['profile_1', 'profile_2', 'profile_3'].includes(p.name));
-  if (candidateProfiles.length === 0) {
-    candidateProfiles = allProfiles.filter(p => p.isLoggedIn);
-  }
-  if (candidateProfiles.length === 0) {
-    return res.status(400).json({ error: 'No active accounts available right now. Please connect an account.' });
-  }
-
-  // Sort candidate profiles numerically so it starts from earliest active accounts (e.g. profile_5, profile_6...)
-  candidateProfiles.sort((a, b) => {
-    const numA = parseInt(a.name.replace(/\D/g, ''), 10) || 0;
-    const numB = parseInt(b.name.replace(/\D/g, ''), 10) || 0;
-    return numA - numB;
+  const requestedQty = Math.max(1, parseInt(quantity, 10) || 1);
+  const order = db.createOrder({
+    service_type: 'comment',
+    target: link,
+    content: comment,
+    quantity: requestedQty,
+    source: 'web'
   });
 
-  const requestedQty = Math.max(1, parseInt(quantity, 10) || 1);
-  // Pick starting active accounts up to requested quantity
-  const selectedProfiles = candidateProfiles.slice(0, requestedQty).map(p => p.name);
-
-  if (currentJob.status === 'running') {
-    return res.json({ success: true, message: 'Another task is currently running! Order queued.' });
-  }
-
-  currentJob = {
-    id: Date.now().toString(),
-    status: 'running',
-    totalTasks: selectedProfiles.length,
-    requestedQty: requestedQty,
-    completedTasks: 0,
-    failedTasks: 0,
-    logs: [],
-    startTime: new Date().toISOString(),
-    stopRequested: false
-  };
-
-  const statusNote = selectedProfiles.length < requestedQty
-    ? `Starting ${selectedProfiles.length} comments (only ${selectedProfiles.length} active accounts connected right now)`
-    : `Starting ${selectedProfiles.length} comments across ${selectedProfiles.length} accounts`;
+  addLog(`📥 [WEB] Order #${order.id} added to Queue! [COMMENT x ${requestedQty}] -> ${link}`, 'info');
 
   res.json({
     success: true,
-    message: statusNote,
-    availableAccounts: candidateProfiles.length,
-    executingAccounts: selectedProfiles.length,
-    requestedQty: requestedQty
+    orderId: order.id,
+    message: `Order #${order.id} accepted! Queued for delivery across active accounts.`
   });
-
-  runAutomationTask([link.trim()], [comment.trim()], selectedProfiles, 10);
 });
 
 app.post('/api/free-follower', async (req, res) => {
@@ -252,55 +365,27 @@ app.post('/api/free-follower', async (req, res) => {
     return res.status(400).json({ error: 'Instagram username or profile link is required' });
   }
 
-  const allProfiles = getProfiles();
-  let candidateProfiles = allProfiles.filter(p => p.isLoggedIn && !['profile_1', 'profile_2', 'profile_3'].includes(p.name));
-  if (candidateProfiles.length === 0) {
-    candidateProfiles = allProfiles.filter(p => p.isLoggedIn);
-  }
-  if (candidateProfiles.length === 0) {
-    return res.status(400).json({ error: 'No active accounts available right now. Please connect an account.' });
-  }
-
-  // Sort candidate profiles numerically so it starts from earliest active accounts
-  candidateProfiles.sort((a, b) => {
-    const numA = parseInt(a.name.replace(/\D/g, ''), 10) || 0;
-    const numB = parseInt(b.name.replace(/\D/g, ''), 10) || 0;
-    return numA - numB;
+  const requestedQty = Math.max(1, parseInt(quantity, 10) || 1);
+  const order = db.createOrder({
+    service_type: 'follower',
+    target: username,
+    quantity: requestedQty,
+    source: 'web'
   });
 
-  const requestedQty = Math.max(1, parseInt(quantity, 10) || 1);
-  // Pick starting active accounts up to requested quantity
-  const selectedProfiles = candidateProfiles.slice(0, requestedQty).map(p => p.name);
-
-  if (currentJob.status === 'running') {
-    return res.json({ success: true, message: 'Another task is currently running! Order queued.' });
-  }
-
-  currentJob = {
-    id: Date.now().toString(),
-    status: 'running',
-    totalTasks: selectedProfiles.length,
-    requestedQty: requestedQty,
-    completedTasks: 0,
-    failedTasks: 0,
-    logs: [],
-    startTime: new Date().toISOString(),
-    stopRequested: false
-  };
-
-  const statusNote = selectedProfiles.length < requestedQty
-    ? `Starting ${selectedProfiles.length} followers (only ${selectedProfiles.length} active accounts connected right now)`
-    : `Starting ${selectedProfiles.length} followers across ${selectedProfiles.length} accounts`;
+  addLog(`📥 [WEB] Order #${order.id} added to Queue! [FOLLOWER x ${requestedQty}] -> @${username}`, 'info');
 
   res.json({
     success: true,
-    message: statusNote,
-    availableAccounts: candidateProfiles.length,
-    executingAccounts: selectedProfiles.length,
-    requestedQty: requestedQty
+    orderId: order.id,
+    message: `Order #${order.id} accepted! Queued for delivery across active accounts.`
   });
+});
 
-  runFollowAutomationTask(username.trim(), selectedProfiles);
+app.get('/api/order/:id', (req, res) => {
+  const order = db.getOrder(req.params.id);
+  if (!order) return res.status(404).json({ error: 'Order not found' });
+  res.json(order);
 });
 
 async function followUserOnPage(page, targetUser) {
@@ -523,7 +608,21 @@ app.get('/api/inspect', (req, res) => {
 });
 
 app.get('/api/status', (req, res) => {
-  res.json(currentJob);
+  const queueStats = db.getOrderStats();
+  const accounts = Object.values(db.data.accounts);
+  const activeCount = accounts.filter(a => a.is_active && a.status !== 'error').length;
+  const activeOrder = db.getNextPendingOrder();
+
+  res.json({
+    id: activeOrder ? activeOrder.id : null,
+    status: activeOrder ? 'running' : 'idle',
+    totalTasks: activeOrder ? activeOrder.quantity : 0,
+    completedTasks: activeOrder ? activeOrder.completed_count : 0,
+    queue: queueStats,
+    activeAccounts: activeCount,
+    activeOrderId: activeOrder ? activeOrder.id : null,
+    logs: currentJob.logs
+  });
 });
 
 let activeBrowserInstance = null;

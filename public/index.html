@@ -213,10 +213,14 @@
 <body>
   <div class="container">
     <!-- Trust Badge -->
-    <div class="trust-badge-wrapper">
+    <div class="trust-badge-wrapper" style="display:flex; justify-content:center; align-items:center; gap:10px; flex-wrap:wrap;">
       <div class="trust-badge">
         <span>Excellent 4.6</span>
         <span class="trust-star">★ Trustpilot</span>
+      </div>
+      <div class="trust-badge" style="background:#1e293b; border:1px solid #334155;">
+        <span style="color:#38bdf8;">⚡ Queue Engine:</span>
+        <span id="queueLiveStats">Active</span>
       </div>
     </div>
 
@@ -404,8 +408,9 @@
 
         const data = await res.json();
         if (data.success) {
+          activeUserOrderId = data.orderId;
           box.className = 'live-status-box status-running';
-          box.innerHTML = `⚡ ${data.message || 'Instagram engine launched... Starting follows...'}`;
+          box.innerHTML = `⚡ ${data.message || 'Order accepted! In queue...'}`;
           setTimeout(pollStatus, 1500);
         } else {
           box.className = 'live-status-box status-error';
@@ -440,7 +445,7 @@
 
       box.style.display = 'flex';
       box.className = 'live-status-box status-running';
-      box.innerHTML = `⚡ Processing order for ${quantity} comments... Connecting to Instagram engine...`;
+      box.innerHTML = `⚡ Submitting order for ${quantity} comments to Queue...`;
 
       try {
         const res = await fetch('/api/free-comment', {
@@ -451,8 +456,9 @@
 
         const data = await res.json();
         if (data.success) {
+          activeUserOrderId = data.orderId;
           box.className = 'live-status-box status-running';
-          box.innerHTML = `⚡ ${data.message || 'Instagram engine launched... Starting comments...'}`;
+          box.innerHTML = `⚡ ${data.message || 'Order accepted! In queue...'}`;
           setTimeout(pollStatus, 1500);
         } else {
           box.className = 'live-status-box status-error';
@@ -468,6 +474,8 @@
       }
     }
 
+    let activeUserOrderId = null;
+
     async function pollStatus() {
       try {
         const r = await fetch('/api/status');
@@ -475,29 +483,58 @@
         const box = document.getElementById('statusBox');
         const btn = document.getElementById('submitBtn');
 
-        if (s.status === 'completed' || (s.totalTasks > 0 && s.completedTasks >= s.totalTasks)) {
-          document.getElementById('stepFill').style.width = '100%';
-          box.className = 'live-status-box status-success';
-          const qtyText = s.completedTasks > 1 ? `${s.completedTasks} accounts` : '1 account';
-          box.innerHTML = currentService === 'follower'
-            ? `✅ SUCCESS! Followed by ${qtyText} live on Instagram!`
-            : `✅ SUCCESS! Posted from ${qtyText} live on Instagram!`;
-          btn.disabled = false;
-          btn.innerText = currentService === 'follower' ? 'Get More Free Followers' : 'Get More Free Comments';
-          updateActiveAccountsBadge();
-        } else if (s.status === 'failed' || (s.totalTasks > 0 && s.failedTasks >= s.totalTasks)) {
-          const errLog = (s.logs && s.logs.slice().reverse().find(l => l.type === 'error')?.message) || 'Action failed. Please check details and try again.';
-          box.className = 'live-status-box status-error';
-          box.innerHTML = '⚠️ ' + errLog;
-          btn.disabled = false;
-          btn.innerText = 'Try Again';
-        } else if (s.status === 'running') {
+        // Update live queue badge
+        if (s.queue) {
+          const statsEl = document.getElementById('queueLiveStats');
+          if (statsEl) statsEl.innerText = `${s.queue.pending || 0} Pending · ${s.queue.completed || 0} Done`;
+        }
+
+        if (activeUserOrderId) {
+          try {
+            const ordRes = await fetch('/api/order/' + activeUserOrderId);
+            const ord = await ordRes.json();
+            if (ord && !ord.error) {
+              if (ord.status === 'completed') {
+                document.getElementById('stepFill').style.width = '100%';
+                box.className = 'live-status-box status-success';
+                const qtyText = ord.completed_count > 1 ? `${ord.completed_count} accounts` : '1 account';
+                box.innerHTML = ord.service_type === 'follower'
+                  ? `✅ SUCCESS! Followed by ${qtyText} live on Instagram! (Order #${ord.id})`
+                  : `✅ SUCCESS! Posted from ${qtyText} live on Instagram! (Order #${ord.id})`;
+                btn.disabled = false;
+                btn.innerText = ord.service_type === 'follower' ? 'Get More Free Followers' : 'Get More Free Comments';
+                updateActiveAccountsBadge();
+                activeUserOrderId = null;
+                return;
+              } else if (ord.status === 'failed') {
+                box.className = 'live-status-box status-error';
+                box.innerHTML = `⚠️ Order #${ord.id} failed: ` + (ord.error || 'Please try again.');
+                btn.disabled = false;
+                btn.innerText = 'Try Again';
+                activeUserOrderId = null;
+                return;
+              } else if (ord.status === 'in_progress') {
+                box.className = 'live-status-box status-running';
+                box.innerHTML = `⚡ Order #${ord.id} in progress: ${ord.completed_count} / ${ord.quantity} delivered...`;
+                setTimeout(pollStatus, 2500);
+                return;
+              } else {
+                box.className = 'live-status-box status-running';
+                box.innerHTML = `⏳ Order #${ord.id} queued in position. Auto-dispatching across accounts...`;
+                setTimeout(pollStatus, 2500);
+                return;
+              }
+            }
+          } catch (_) {}
+        }
+
+        if (s.status === 'running') {
           box.className = 'live-status-box status-running';
-          const latestLog = (s.logs && s.logs.length > 0) ? s.logs[0].message : 'Instagram browser engine is working...';
-          box.innerHTML = `⚡ Progress: ${s.completedTasks} / ${s.totalTasks} accounts completed · ${latestLog}`;
-          setTimeout(pollStatus, 2000);
+          const latestLog = (s.logs && s.logs.length > 0) ? s.logs[0].message : 'Queue engine working...';
+          box.innerHTML = `⚡ Queue working · ${latestLog}`;
+          setTimeout(pollStatus, 2500);
         } else {
-          setTimeout(pollStatus, 2000);
+          setTimeout(pollStatus, 3000);
         }
       } catch (e) {
         setTimeout(pollStatus, 3000);
@@ -506,16 +543,18 @@
 
     async function updateActiveAccountsBadge() {
       try {
-        const r = await fetch('/api/profiles');
+        const r = await fetch('/api/status');
         const d = await r.json();
-        if (d.profiles && Array.isArray(d.profiles)) {
-          const activeList = d.profiles.filter(p => p.isLoggedIn && !['profile_1', 'profile_2', 'profile_3'].includes(p.name));
-          const count = activeList.length;
-          const badgeText = `${count} Active Account${count === 1 ? '' : 's'} Ready`;
-          const badgeComment = document.getElementById('commentAvailableBadge');
-          const badgeFollower = document.getElementById('followerAvailableBadge');
-          if (badgeComment) badgeComment.innerText = badgeText;
-          if (badgeFollower) badgeFollower.innerText = badgeText;
+        const count = d.activeAccounts || 0;
+        const badgeText = `${count} Active Account${count === 1 ? '' : 's'} Ready`;
+        const badgeComment = document.getElementById('commentAvailableBadge');
+        const badgeFollower = document.getElementById('followerAvailableBadge');
+        if (badgeComment) badgeComment.innerText = badgeText;
+        if (badgeFollower) badgeFollower.innerText = badgeText;
+
+        if (d.queue) {
+          const statsEl = document.getElementById('queueLiveStats');
+          if (statsEl) statsEl.innerText = `${d.queue.pending || 0} Pending · ${d.queue.completed || 0} Done`;
         }
       } catch (_) {}
     }
