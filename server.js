@@ -288,6 +288,51 @@ app.get('/api/user/orders', (req, res) => {
 // 🚀 SMM PANEL STANDARD API (v2) - MOTHER PROVIDER
 // Compatible with Perfect Panel, SmartPanel, etc.
 // ==========================================
+// 🚀 SMM PANEL STANDARD API (v2) - MOTHER PROVIDER
+// Compatible with Perfect Panel, SmartPanel, etc.
+// ==========================================
+const RANDOM_COMMENTS_POOL = [
+  "Superb reel bro 🔥",
+  "Loved this! Amazing content ❤️",
+  "Awesome post! Keep it up 👏",
+  "Pure fire 🔥🔥",
+  "This is so good 😍",
+  "Really inspiring work 💯",
+  "Great vibes ✨",
+  "Outstanding post 👌",
+  "Mind blowing content 💥",
+  "Clean and perfect ❤️🔥",
+  "Looking great! 🔥",
+  "Top notch work! 🚀",
+  "Nice post 👏",
+  "Very well made! 👍",
+  "Fantastic video 🔥",
+  "Keep shining brother ✨",
+  "Too good! ❤️",
+  "Loved every bit of this 🙌",
+  "Simply amazing 🔥",
+  "Quality at its best 💯",
+  "Brilliant work brother 🔥",
+  "So aesthetically pleasing ✨",
+  "Crazy skills! Keep grinding 💪",
+  "Great presentation 👌",
+  "Best reel on my feed today ❤️",
+  "Fab content brother 🙌🔥",
+  "Such positive energy ✨",
+  "Keep creating awesome stuff 🔥",
+  "Loved the vibe ❤️",
+  "Next level quality 🚀"
+];
+
+function getRandomComments(count) {
+  const shuffled = [...RANDOM_COMMENTS_POOL].sort(() => 0.5 - Math.random());
+  const selected = [];
+  for (let i = 0; i < count; i++) {
+    selected.push(shuffled[i % shuffled.length]);
+  }
+  return selected;
+}
+
 app.all('/api/v2', (req, res) => {
   const params = { ...req.query, ...req.body };
   const action = (params.action || '').toLowerCase();
@@ -319,6 +364,18 @@ app.all('/api/v2', (req, res) => {
         dripfeed: false,
         refill: false,
         cancel: false
+      },
+      {
+        service: 3,
+        name: 'Instagram Random Comments (Safe Rotating Indian Residential Pool)',
+        type: 'Default',
+        category: 'Instagram Comments',
+        rate: '0.00',
+        min: 1,
+        max: 1000,
+        dripfeed: false,
+        refill: false,
+        cancel: false
       }
     ]);
   }
@@ -337,7 +394,7 @@ app.all('/api/v2', (req, res) => {
     return res.json({ balance: '10000.00', currency: 'INR' });
   }
 
-  // 3. Add Order (Service 1 = Comments, Service 2 = Followers)
+  // 3. Add Order (Service 1 = Custom Comments, Service 2 = Followers, Service 3 = Random Comments)
   if (action === 'add') {
     const service = parseInt(params.service, 10);
     const link = (params.link || '').trim();
@@ -358,15 +415,33 @@ app.all('/api/v2', (req, res) => {
     }
 
     let order;
-    if (service === 1 || (!service && comments) || (service !== 2 && comments) || String(params.service).toLowerCase().includes('comment')) {
-      // SERVICE 1: INSTAGRAM CUSTOM COMMENTS (Min: 1)
+
+    // SERVICE 3: INSTAGRAM RANDOM COMMENTS (Default type, auto-generated positive comments)
+    if (service === 3 || (!service && !comments && params.type === 'random') || String(params.service).toLowerCase().includes('random')) {
+      if (!quantity || isNaN(quantity) || quantity < 1) {
+        quantity = 1;
+      }
+      const randomCommentsList = getRandomComments(quantity);
+      order = db.createOrder({
+        service_type: 'comment',
+        target: link,
+        content: randomCommentsList.join('\n'),
+        quantity: quantity,
+        source: 'smm_panel',
+        user_id: user.id,
+        api_key: user.api_key
+      });
+      addLog(`📥 [SMM API v2] Order #${order.id} [RANDOM COMMENTS x ${quantity}] received for ${link}`, 'info');
+    }
+    // SERVICE 1: INSTAGRAM CUSTOM COMMENTS (User provided text)
+    else if (service === 1 || (!service && comments) || (service !== 2 && comments) || String(params.service).toLowerCase().includes('custom')) {
       const commentLines = comments ? comments.split(/\r\n|\r|\n/).map(c => c.trim()).filter(Boolean) : [];
       if (!quantity || isNaN(quantity) || quantity < 1) {
         quantity = commentLines.length > 0 ? commentLines.length : 1;
       } else if (commentLines.length > 0 && quantity < commentLines.length) {
         quantity = commentLines.length;
       }
-      const finalComment = comments || 'Awesome post 🔥';
+      const finalComment = comments || getRandomComments(quantity).join('\n');
 
       order = db.createOrder({
         service_type: 'comment',
@@ -378,8 +453,9 @@ app.all('/api/v2', (req, res) => {
         api_key: user.api_key
       });
       addLog(`📥 [SMM API v2] Order #${order.id} [CUSTOM COMMENTS x ${quantity}] received for ${link}`, 'info');
-    } else {
-      // SERVICE 2: INSTAGRAM REAL FOLLOWERS (Min: 1)
+    }
+    // SERVICE 2: INSTAGRAM REAL FOLLOWERS
+    else {
       if (!quantity || isNaN(quantity) || quantity < 1) {
         quantity = 1;
       }
@@ -391,9 +467,10 @@ app.all('/api/v2', (req, res) => {
         user_id: user.id,
         api_key: user.api_key
       });
+      addLog(`📥 [SMM API v2] Order #${order.id} [FOLLOWERS x ${quantity}] received for ${link}`, 'info');
     }
 
-    addLog(`📥 [SMM API] Order #${order.id} received from User #${user.id} (${user.email})! [SERVICE ${service || (order.service_type === 'comment' ? 1 : 2)}: ${order.service_type.toUpperCase()} x ${order.quantity}] -> ${order.target}`, 'info');
+    addLog(`📥 [SMM API] Order #${order.id} accepted from User #${user.id} (${user.email})! [SERVICE ${service || (order.service_type === 'comment' ? 1 : 2)}: ${order.service_type.toUpperCase()} x ${order.quantity}] -> ${order.target}`, 'info');
     return res.json({ order: order.id });
   }
 

@@ -1,6 +1,6 @@
 {
   "nextUserId": 4,
-  "nextOrderId": 10016,
+  "nextOrderId": 10018,
   "users": [
     {
       "id": 1,
@@ -289,17 +289,66 @@
       "target": "https://www.instagram.com/reel/DaMg0ZMMV3b/",
       "content": "First custom comment 🔥\nSecond custom comment ❤️\nThird custom comment 🚀",
       "quantity": 3,
-      "completed_count": 0,
-      "status": "in_progress",
-      "assigned_accounts": [],
+      "completed_count": 3,
+      "status": "completed",
+      "assigned_accounts": [
+        "profile_14",
+        "profile_17",
+        "profile_18"
+      ],
       "source": "smm_panel",
       "created_at": "2026-09-22T19:32:20.259Z",
-      "updated_at": "2026-09-22T19:32:52.575Z",
-      "error": "Could not locate comment input. Ensure account is logged into Instagram and post allows comments.",
-      "retries": 1,
+      "updated_at": "2026-09-22T19:35:52.388Z",
+      "error": null,
+      "retries": 3,
       "failed_accounts": [
-        "profile_11"
+        "profile_11",
+        "profile_13",
+        "profile_16"
       ]
+    },
+    {
+      "id": 10016,
+      "user_id": 3,
+      "api_key": "whop_4aef1db2ad6f2dfefa352baf93d2b348",
+      "service_type": "comment",
+      "target": "https://www.instagram.com/p/test123456/",
+      "content": "Great post!\nAwesome work!",
+      "quantity": 2,
+      "completed_count": 0,
+      "status": "failed",
+      "assigned_accounts": [],
+      "source": "smm_panel",
+      "created_at": "2026-09-22T19:40:12.204Z",
+      "updated_at": "2026-09-22T19:42:55.103Z",
+      "error": "Could not locate comment input. Ensure account is logged into Instagram and post allows comments.",
+      "retries": 6,
+      "failed_accounts": [
+        "profile_19",
+        "profile_20",
+        "profile_21",
+        "profile_6",
+        "profile_11",
+        "profile_13"
+      ]
+    },
+    {
+      "id": 10017,
+      "user_id": 2,
+      "api_key": "whop_fc6df59a716ebf49dcfe0609f3f0405c",
+      "service_type": "comment",
+      "target": "https://www.instagram.com/reel/DaMg0ZMMV3b/",
+      "content": "Keep shining brother ✨\nSuperb reel bro 🔥",
+      "quantity": 2,
+      "completed_count": 1,
+      "status": "in_progress",
+      "assigned_accounts": [
+        "profile_14"
+      ],
+      "source": "smm_panel",
+      "created_at": "2026-09-22T19:57:15.651Z",
+      "updated_at": "2026-09-22T19:57:39.360Z",
+      "error": null
     }
   ],
   "accounts": {
@@ -350,7 +399,7 @@
       "is_active": true,
       "actions_today": 5,
       "total_actions": 5,
-      "last_action_at": "2026-09-22T19:23:51.930Z",
+      "last_action_at": "2026-09-22T19:41:49.042Z",
       "last_reset_date": "2026-09-22",
       "status": "ready"
     },
@@ -360,7 +409,7 @@
       "is_active": true,
       "actions_today": 3,
       "total_actions": 3,
-      "last_action_at": "2026-09-22T19:32:47.573Z",
+      "last_action_at": "2026-09-22T19:42:17.423Z",
       "last_reset_date": "2026-09-22",
       "status": "ready"
     },
@@ -370,7 +419,7 @@
       "is_active": true,
       "actions_today": 1,
       "total_actions": 1,
-      "last_action_at": "2026-09-22T18:20:51.214Z",
+      "last_action_at": "2026-09-22T19:42:55.102Z",
       "last_reset_date": "2026-09-22",
       "status": "ready"
     },
@@ -378,11 +427,11 @@
       "profile_name": "profile_14",
       "username": "annmorales4398",
       "is_active": true,
-      "actions_today": 1,
-      "total_actions": 1,
-      "last_action_at": "2026-09-22T18:21:09.132Z",
+      "actions_today": 3,
+      "total_actions": 3,
+      "last_action_at": "2026-09-22T19:57:39.360Z",
       "last_reset_date": "2026-09-22",
-      "status": "ready"
+      "status": "cooldown"
     },
     "profile_15": {
       "profile_name": "profile_15",
@@ -401,7 +450,7 @@
       "is_active": true,
       "actions_today": 0,
       "total_actions": 0,
-      "last_action_at": "2026-09-22T18:21:35.048Z",
+      "last_action_at": "2026-09-22T19:34:27.655Z",
       "last_reset_date": "2026-09-22",
       "status": "ready"
     },
@@ -409,9 +458,9 @@
       "profile_name": "profile_17",
       "username": "paigeknox638",
       "is_active": true,
-      "actions_today": 0,
-      "total_actions": 0,
-      "last_action_at": "2026-09-22T18:22:13.622Z",
+      "actions_today": 1,
+      "total_actions": 1,
+      "last_action_at": "2026-09-22T19:34:56.599Z",
       "last_reset_date": "2026-09-22",
       "status": "ready"
     },
@@ -419,9 +468,9 @@
       "profile_name": "profile_18",
       "username": "vivianreed2513",
       "is_active": true,
-      "actions_today": 1,
-      "total_actions": 1,
-      "last_action_at": "2026-09-22T18:22:40.667Z",
+      "actions_today": 2,
+      "total_actions": 2,
+      "last_action_at": "2026-09-22T19:35:52.387Z",
       "last_reset_date": "2026-09-22",
       "status": "ready"
     },
@@ -431,7 +480,7 @@
       "is_active": true,
       "actions_today": 2,
       "total_actions": 2,
-      "last_action_at": "2026-09-22T18:27:58.782Z",
+      "last_action_at": "2026-09-22T19:40:22.836Z",
       "last_reset_date": "2026-09-22",
       "status": "ready"
     },
@@ -441,7 +490,7 @@
       "is_active": true,
       "actions_today": 1,
       "total_actions": 1,
-      "last_action_at": "2026-09-22T18:29:03.516Z",
+      "last_action_at": "2026-09-22T19:40:51.829Z",
       "last_reset_date": "2026-09-22",
       "status": "ready"
     },
@@ -451,7 +500,7 @@
       "is_active": true,
       "actions_today": 1,
       "total_actions": 1,
-      "last_action_at": "2026-09-22T18:30:36.090Z",
+      "last_action_at": "2026-09-22T19:41:20.451Z",
       "last_reset_date": "2026-09-22",
       "status": "ready"
     }
